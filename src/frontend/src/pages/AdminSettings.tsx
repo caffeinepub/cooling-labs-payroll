@@ -7,6 +7,7 @@ import {
   KeyRound,
   LogOut,
   Save,
+  ShieldCheck,
   Upload,
   User,
 } from "lucide-react";
@@ -29,6 +30,34 @@ import {
   getCompanySettings,
   saveCompanySettings,
 } from "../services/companySettings";
+import {
+  DEFAULT_PERMISSIONS,
+  getGlobalDefaults,
+  saveGlobalDefaults,
+} from "../services/supervisorPermissionsStorage";
+import type { SupervisorPermissions } from "../types";
+
+function PermRow({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <div>
+        <p className="text-sm font-medium text-gray-800">{label}</p>
+        {desc && <p className="text-xs text-gray-500">{desc}</p>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
 
 export function AdminSettings() {
   const { logout, changePassword, updateAdminProfile, adminName } =
@@ -47,6 +76,10 @@ export function AdminSettings() {
     React.useState(getCompanySettings);
   const [savingLogo, setSavingLogo] = useState(false);
   const [importSettings, setImportSettings] = React.useState(getImportSettings);
+  const [globalPerms, setGlobalPerms] = React.useState<SupervisorPermissions>(
+    () => getGlobalDefaults(),
+  );
+  const [savingGlobalPerms, setSavingGlobalPerms] = useState(false);
 
   const handleLogoUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,6 +166,24 @@ export function AdminSettings() {
     addToast("Import settings saved", "success");
   }, [importSettings, addToast]);
 
+  const handleSaveGlobalPerms = useCallback(() => {
+    setSavingGlobalPerms(true);
+    saveGlobalDefaults(globalPerms);
+    addToast("Default supervisor permissions saved", "success");
+    setSavingGlobalPerms(false);
+  }, [globalPerms, addToast]);
+
+  const setGP = (path: string[], val: boolean) => {
+    setGlobalPerms((prev) => {
+      const next = JSON.parse(JSON.stringify(prev)) as SupervisorPermissions;
+      // biome-ignore lint/suspicious/noExplicitAny: dynamic path update
+      let obj: any = next;
+      for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+      obj[path[path.length - 1]] = val;
+      return next;
+    });
+  };
+
   return (
     <div className="max-w-lg space-y-6">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -143,9 +194,9 @@ export function AdminSettings() {
           <User className="w-5 h-5 text-gray-400" />
           <h3 className="text-sm font-semibold text-gray-700">Admin Profile</h3>
         </div>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-            <User className="w-7 h-7 text-white" />
+        <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
+            {adminName.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1">
             <p className="font-semibold text-gray-900">{adminName}</p>
@@ -499,6 +550,148 @@ export function AdminSettings() {
             data-ocid="attendance_import.save_button"
           >
             <Save className="w-4 h-4 mr-2" /> Save Import Settings
+          </Button>
+        </div>
+      </div>
+
+      {/* Default Supervisor Permissions */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <ShieldCheck className="w-5 h-5 text-gray-400" />
+          <h3 className="text-sm font-semibold text-gray-700">
+            Default Supervisor Permissions
+          </h3>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">
+          These defaults apply to all new supervisors unless overridden
+          individually in User Management. Global Default → can be overridden
+          per supervisor.
+        </p>
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Attendance
+          </p>
+          <PermRow
+            label="View Attendance"
+            checked={globalPerms.attendance.view}
+            onChange={(v) => setGP(["attendance", "view"], v)}
+          />
+          <PermRow
+            label="Mark Attendance"
+            checked={globalPerms.attendance.mark}
+            onChange={(v) => setGP(["attendance", "mark"], v)}
+          />
+          <PermRow
+            label="Bulk Mark"
+            checked={globalPerms.attendance.bulk}
+            onChange={(v) => setGP(["attendance", "bulk"], v)}
+          />
+          <PermRow
+            label="Date Range Attendance"
+            checked={globalPerms.attendance.dateRange}
+            onChange={(v) => setGP(["attendance", "dateRange"], v)}
+          />
+          <PermRow
+            label="Request Correction Only"
+            desc="Supervisor can only raise requests, not directly edit"
+            checked={globalPerms.attendance.requestCorrectionOnly}
+            onChange={(v) => setGP(["attendance", "requestCorrectionOnly"], v)}
+          />
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            OT
+          </p>
+          <PermRow
+            label="View OT"
+            checked={globalPerms.ot.view}
+            onChange={(v) => setGP(["ot", "view"], v)}
+          />
+          <PermRow
+            label="Add OT Request"
+            checked={globalPerms.ot.add}
+            onChange={(v) => setGP(["ot", "add"], v)}
+          />
+          <PermRow
+            label="Require Admin Approval for OT"
+            checked={globalPerms.ot.requireApproval}
+            onChange={(v) => setGP(["ot", "requireApproval"], v)}
+          />
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            Advance
+          </p>
+          <PermRow
+            label="View Advance"
+            checked={globalPerms.advance.view}
+            onChange={(v) => setGP(["advance", "view"], v)}
+          />
+          <PermRow
+            label="Add Advance Request"
+            checked={globalPerms.advance.add}
+            onChange={(v) => setGP(["advance", "add"], v)}
+          />
+          <PermRow
+            label="Require Admin Approval for Advance"
+            checked={globalPerms.advance.requireApproval}
+            onChange={(v) => setGP(["advance", "requireApproval"], v)}
+          />
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            Payroll
+          </p>
+          <PermRow
+            label="View Salary Summary"
+            checked={globalPerms.payroll.viewSummary}
+            onChange={(v) => setGP(["payroll", "viewSummary"], v)}
+          />
+          <PermRow
+            label="View Payroll Rows"
+            checked={globalPerms.payroll.viewRows}
+            onChange={(v) => setGP(["payroll", "viewRows"], v)}
+          />
+          <PermRow
+            label="Download Payslip"
+            checked={globalPerms.payroll.downloadPayslip}
+            onChange={(v) => setGP(["payroll", "downloadPayslip"], v)}
+          />
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            Import
+          </p>
+          <PermRow
+            label="View Import History"
+            checked={globalPerms.import.viewHistory}
+            onChange={(v) => setGP(["import", "viewHistory"], v)}
+          />
+          <PermRow
+            label="Upload Attendance"
+            checked={globalPerms.import.upload}
+            onChange={(v) => setGP(["import", "upload"], v)}
+          />
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            Regularization
+          </p>
+          <PermRow
+            label="Raise Regularization"
+            checked={globalPerms.regularization.raise}
+            onChange={(v) => setGP(["regularization", "raise"], v)}
+          />
+          <PermRow
+            label="Approve Regularization"
+            desc="Default: OFF — only admin approves by default"
+            checked={globalPerms.regularization.approve}
+            onChange={(v) => setGP(["regularization", "approve"], v)}
+          />
+        </div>
+        <div className="mt-5">
+          <Button
+            size="sm"
+            onClick={handleSaveGlobalPerms}
+            disabled={savingGlobalPerms}
+            data-ocid="settings.save_button"
+          >
+            <Save className="w-4 h-4 mr-2" /> Save Default Permissions
           </Button>
         </div>
       </div>

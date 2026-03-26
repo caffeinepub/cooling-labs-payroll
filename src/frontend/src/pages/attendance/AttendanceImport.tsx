@@ -689,7 +689,7 @@ export function AttendanceImport() {
         const empId = String(r[colMap.employeeId] ?? "").trim();
         const nd = normalizeDate(r[colMap.date]);
         const resolvedEmp = empById.get(empId.toLowerCase());
-        if (resolvedEmp && nd) allKeys.push(`${resolvedEmp.employeeId}_${nd}`);
+        if (resolvedEmp && nd) allKeys.push(`${resolvedEmp.id}_${nd}`);
       }
       const existingSet = getExistingKeys(allKeys);
 
@@ -862,8 +862,7 @@ export function AttendanceImport() {
           if (vStatus === "valid") vStatus = "warning";
         }
 
-        const systemKey =
-          resolvedEmp && nd ? `${resolvedEmp.employeeId}_${nd}` : "";
+        const systemKey = resolvedEmp && nd ? `${resolvedEmp.id}_${nd}` : "";
         const existsInSystem = systemKey ? existingSet.has(systemKey) : false;
         if (existsInSystem) {
           notes.push(
@@ -1009,7 +1008,10 @@ export function AttendanceImport() {
       }
       if (row.resolvedSiteId) involvedSiteIds.add(row.resolvedSiteId);
 
-      const source = row.advance > 0 ? `import|adv:${row.advance}` : "import";
+      const source = "import";
+      console.debug(
+        `[Import] Row ${row.rowNum}: ${row.employeeId} ${row.normalizedDate} ${row.normalizedStatus} OT=${row.otHours} Adv=${row.advance} action=${row.importAction}`,
+      );
 
       if (row.importAction === "import") {
         const ok = markAttendance(
@@ -1022,9 +1024,17 @@ export function AttendanceImport() {
           0,
           0,
           source,
+          row.advance,
         );
-        if (ok) imported++;
-        else skipped++;
+        if (ok) {
+          imported++;
+          console.debug(`[Import] COMMITTED: ${emp.id} ${row.normalizedDate}`);
+        } else {
+          skipped++;
+          console.debug(
+            `[Import] SKIPPED (exists): ${emp.id} ${row.normalizedDate}`,
+          );
+        }
       } else if (row.importAction === "overwrite") {
         markAttendanceOverwrite(
           emp.id,
@@ -1036,8 +1046,10 @@ export function AttendanceImport() {
           0,
           0,
           source,
+          row.advance,
         );
         imported++;
+        console.debug(`[Import] OVERWRITE: ${emp.id} ${row.normalizedDate}`);
       } else if (row.importAction === "merge") {
         const existingKey = `${emp.id}_${row.normalizedDate}`;
         const existingMergeSet = getExistingKeys([existingKey]);
@@ -1052,6 +1064,7 @@ export function AttendanceImport() {
             0,
             0,
             source,
+            row.advance,
           );
         } else {
           markAttendanceOverwrite(
@@ -1064,9 +1077,11 @@ export function AttendanceImport() {
             0,
             0,
             source,
+            row.advance,
           );
         }
         imported++;
+        console.debug(`[Import] MERGED: ${emp.id} ${row.normalizedDate}`);
       }
 
       if (row.advance > 0) advanceCount++;

@@ -162,8 +162,18 @@ function buildBreakdownsForMonth(
     const esiDeduction =
       emp.esiApplicable && finalGross <= 21000 ? r2(finalGross * 0.0075) : 0;
     const ptDeduction = 0;
-    const advanceDeduction = 0;
+    // Aggregate advance from attendance records for this employee/month
+    const advanceDeduction = r2(
+      empRecs.reduce(
+        (s, a) =>
+          s + ((a as unknown as { advanceAmount?: number }).advanceAmount ?? 0),
+        0,
+      ),
+    );
     const otherDeduction = 0;
+    console.debug(
+      `[Payroll] ${emp.name} (${emp.employeeId}): attRecs=${empRecs.length} present=${presentDays} half=${halfDays} leave=${paidLeaveDays} paidDays=${paidDays} OT=${otHours} adv=${advanceDeduction}`,
+    );
 
     const netPay = r2(
       finalGross -

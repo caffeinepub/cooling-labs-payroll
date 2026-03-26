@@ -10,6 +10,7 @@ import { AdminAuthProvider } from "./context/AdminAuthContext";
 import { AppProvider } from "./context/AppContext";
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminSettings } from "./pages/AdminSettings";
+import { ApprovalsCenter } from "./pages/ApprovalsCenter";
 import { Dashboard } from "./pages/Dashboard";
 import { Employees } from "./pages/Employees";
 import { Masters } from "./pages/Masters";
@@ -110,6 +111,11 @@ const adminSettingsRoute = createRoute({
   path: "/admin/settings",
   component: AdminSettings,
 });
+const approvalsCenterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/approvals",
+  component: ApprovalsCenter,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -129,6 +135,7 @@ const routeTree = rootRoute.addChildren([
   mastersSitesRoute,
   adminLoginRoute,
   adminSettingsRoute,
+  approvalsCenterRoute,
 ]);
 
 const router = createRouter({ routeTree });

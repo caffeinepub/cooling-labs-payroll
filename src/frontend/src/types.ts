@@ -63,6 +63,10 @@ export interface AttendanceRecord {
   date: string;
   status: string;
   otHours: number;
+  /** Advance amount recorded at time of attendance entry (from import / WhatsApp ADV) */
+  advanceAmount?: number;
+  /** Source of this record: single / bulk / import / whatsapp / regularization */
+  source?: string;
   punchIn: string;
   punchOut: string;
   lat: number;
@@ -134,6 +138,40 @@ export interface Advance {
   createdAt: bigint;
 }
 
+export interface SupervisorPermissions {
+  attendance: {
+    view: boolean;
+    mark: boolean;
+    bulk: boolean;
+    dateRange: boolean;
+    requestCorrectionOnly: boolean;
+  };
+  ot: {
+    view: boolean;
+    add: boolean;
+    requireApproval: boolean;
+  };
+  advance: {
+    view: boolean;
+    add: boolean;
+    requireApproval: boolean;
+  };
+  payroll: {
+    viewSummary: boolean;
+    viewRows: boolean;
+    downloadPayslip: boolean;
+  };
+  import: {
+    viewHistory: boolean;
+    upload: boolean;
+    requireApproval: boolean;
+  };
+  regularization: {
+    raise: boolean;
+    approve: boolean;
+  };
+}
+
 /** Supervisor / user with role-based login */
 export interface Supervisor {
   phone: string;
@@ -146,6 +184,8 @@ export interface Supervisor {
   /** Plain-text password stored in localStorage (same approach as admin) */
   password?: string;
   role?: "supervisor" | "admin";
+  /** Per-supervisor permission overrides. Falls back to global defaults if not set. */
+  permissions?: SupervisorPermissions;
 }
 
 export interface RegularizationRequest {
@@ -160,6 +200,37 @@ export interface RegularizationRequest {
   approvedBy: string;
   approvedAt: bigint;
   createdAt: bigint;
+  // Extended fields (optional, backward compat)
+  oldOtHours?: number;
+  newOtHours?: number;
+  oldAdvance?: number;
+  newAdvance?: number;
+  approvalRemark?: string;
+  requestType?: "status" | "ot" | "advance" | "combined";
+  siteId?: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  requestType:
+    | "attendance_correction"
+    | "ot_request"
+    | "advance_request"
+    | "regularization"
+    | "leave_request";
+  employeeId: string;
+  siteId: string;
+  date: string; // YYYYMMDD format
+  monthRef: string; // YYYYMM format
+  oldValue: Record<string, unknown>;
+  newValue: Record<string, unknown>;
+  reason: string;
+  requestedBy: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  approvedBy: string;
+  approvedAt: number;
+  approvalRemark: string;
+  createdAt: number;
 }
 
 export interface UserProfile {

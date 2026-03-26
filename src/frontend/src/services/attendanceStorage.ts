@@ -2,6 +2,9 @@
  * attendanceStorage.ts
  * localStorage-backed attendance CRUD.
  * Bypasses ICP canister entirely.
+ *
+ * Canonical data store for ALL attendance sources:
+ * Single Entry | Bulk | Import | WhatsApp | Regularization
  */
 import type { AttendanceRecord } from "../types";
 
@@ -10,6 +13,8 @@ const KEY = "clf_attendance";
 type RawRecord = Omit<AttendanceRecord, "updatedAt" | "createdAt"> & {
   updatedAt: number;
   createdAt: number;
+  advanceAmount?: number;
+  source?: string;
 };
 
 function load(): RawRecord[] {
@@ -24,11 +29,19 @@ function load(): RawRecord[] {
 
 function save(data: RawRecord[]): void {
   localStorage.setItem(KEY, JSON.stringify(data));
+  // Notify same-tab listeners (storage event only fires across tabs)
+  try {
+    window.dispatchEvent(new CustomEvent("clf:attendance-updated"));
+  } catch {
+    // ignore in SSR/test environments
+  }
 }
 
 function toRecord(r: RawRecord): AttendanceRecord {
   return {
     ...r,
+    advanceAmount: r.advanceAmount ?? 0,
+    source: r.source ?? r.changedBy,
     updatedAt: BigInt(r.updatedAt),
     createdAt: BigInt(r.createdAt),
   };
@@ -38,6 +51,11 @@ function genId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Mark attendance for empId on dateStr.
+ * Returns false (and does NOT write) if a record already exists.
+ * advanceAmount — optional advance for this entry (from import / WhatsApp ADV)
+ */
 export function markAttendance(
   empId: string,
   dateStr: string,
@@ -48,6 +66,7 @@ export function markAttendance(
   lat: number,
   lng: number,
   source: string,
+  advanceAmount = 0,
 ): boolean {
   const records = load();
   const exists = records.some(
@@ -61,6 +80,8 @@ export function markAttendance(
     date: dateStr,
     status,
     otHours,
+    advanceAmount,
+    source,
     punchIn,
     punchOut,
     lat,
@@ -74,9 +95,16 @@ export function markAttendance(
     createdAt: now,
   });
   save(records);
+  console.debug(
+    `[AttendanceStorage] Created: ${empId} ${dateStr} ${status} OT=${otHours} Adv=${advanceAmount}`,
+  );
   return true;
 }
 
+/**
+ * Create or replace attendance for empId on dateStr (overwrite mode).
+ * advanceAmount — optional advance for this entry
+ */
 export function markAttendanceOverwrite(
   empId: string,
   dateStr: string,
@@ -87,6 +115,7 @@ export function markAttendanceOverwrite(
   lat: number,
   lng: number,
   source: string,
+  advanceAmount = 0,
 ): void {
   const records = load();
   const now = Date.now();
@@ -99,6 +128,8 @@ export function markAttendanceOverwrite(
     date: dateStr,
     status,
     otHours,
+    advanceAmount,
+    source,
     punchIn,
     punchOut,
     lat,
@@ -117,11 +148,69 @@ export function markAttendanceOverwrite(
     records.push(entry);
   }
   save(records);
+  console.debug(
+    `[AttendanceStorage] Overwrite: ${empId} ${dateStr} ${status} OT=${otHours} Adv=${advanceAmount}`,
+  );
 }
 
-/** Return set of "empId_dateStr" keys that already exist */
+/**
+ * Update (or create) advance amount for a specific empId + date.
+ * Used by WhatsApp ADV command.
+ */
+export function updateAttendanceAdvance(
+  empId: string,
+  dateStr: string,
+  advanceAmount: number,
+  source: string,
+): boolean {
+  const records = load();
+  const idx = records.findIndex(
+    (r) => r.employeeId === empId && r.date === dateStr,
+  );
+  if (idx >= 0) {
+    records[idx].advanceAmount =
+      (records[idx].advanceAmount ?? 0) + advanceAmount;
+    records[idx].changedBy = source;
+    records[idx].updatedAt = Date.now();
+    save(records);
+    console.debug(
+      `[AttendanceStorage] Advance updated: ${empId} ${dateStr} adv=${advanceAmount}`,
+    );
+    return true;
+  }
+  // No record for today — create one with Present status and advance
+  const now = Date.now();
+  records.push({
+    id: genId(),
+    employeeId: empId,
+    date: dateStr,
+    status: "Present",
+    otHours: 0,
+    advanceAmount,
+    source,
+    punchIn: "",
+    punchOut: "",
+    lat: 0,
+    lng: 0,
+    isFlagged: false,
+    flagReason: "",
+    isRegularized: false,
+    regularizationReason: "",
+    changedBy: source,
+    updatedAt: now,
+    createdAt: now,
+  });
+  save(records);
+  console.debug(
+    `[AttendanceStorage] Advance created: ${empId} ${dateStr} adv=${advanceAmount}`,
+  );
+  return true;
+}
+
+/** Return set of "empId_dateStr" keys that already exist (uses internal empId / UUID) */
 export function getExistingKeys(keys: string[]): Set<string> {
   const records = load();
+  // Keys are built with internal emp.id (UUID), same as stored in employeeId field
   const existing = new Set(records.map((r) => `${r.employeeId}_${r.date}`));
   const result = new Set<string>();
   for (const k of keys) {
@@ -154,6 +243,8 @@ export function bulkMarkAttendance(
       date: dateStr,
       status,
       otHours,
+      advanceAmount: 0,
+      source,
       punchIn: "",
       punchOut: "",
       lat: 0,
@@ -203,6 +294,8 @@ export function bulkMarkAttendanceOverwrite(
         date: dateStr,
         status,
         otHours,
+        advanceAmount: 0,
+        source,
         punchIn: "",
         punchOut: "",
         lat: 0,

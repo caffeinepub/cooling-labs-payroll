@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Bell,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -20,8 +21,9 @@ import {
   Users2,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
+import * as approvalsStorage from "../services/approvalsStorage";
 
 const navBase =
   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150";
@@ -69,11 +71,25 @@ export function Sidebar() {
   const { isAdmin } = useAppContext();
   const router = useRouterState();
   const pathname = router.location.pathname;
+  const [pendingCount, setPendingCount] = useState(0);
 
   const toggleAtt = useCallback(() => setAttOpen((p) => !p), []);
   const toggleMasters = useCallback(() => setMastersOpen((p) => !p), []);
   const isAttActive = pathname.startsWith("/attendance");
   const isMastersActive = pathname.startsWith("/masters");
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const refresh = () => setPendingCount(approvalsStorage.getPendingCount());
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    const handler = () => refresh();
+    window.addEventListener("clf:attendance-updated", handler);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("clf:attendance-updated", handler);
+    };
+  }, [isAdmin]);
 
   return (
     <div
@@ -102,6 +118,18 @@ export function Sidebar() {
         <NavItem to="/">
           <LayoutDashboard className="w-4 h-4" /> Dashboard
         </NavItem>
+
+        {isAdmin && (
+          <NavItem to="/admin/approvals" data-ocid="approvals.link">
+            <Bell className="w-4 h-4" /> Approvals
+            {pendingCount > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {pendingCount}
+              </span>
+            )}
+          </NavItem>
+        )}
+
         <NavItem to="/employees">
           <Users className="w-4 h-4" /> Employees
         </NavItem>

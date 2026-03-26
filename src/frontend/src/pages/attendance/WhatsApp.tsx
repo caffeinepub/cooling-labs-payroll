@@ -181,13 +181,22 @@ export function WhatsApp() {
           });
           continue;
         }
-        // Advance stored locally (mock — no advance storage yet)
+        // Write advance to canonical attendance store for payroll integration
+        attendanceStorage.updateAttendanceAdvance(
+          emp.id,
+          today,
+          amount,
+          "whatsapp",
+        );
+        console.debug(
+          `[WhatsApp] ADV committed: ${emp.id} ${today} adv=${amount}`,
+        );
         results.push({
           id: entryId,
           line,
           type: "ADV",
           status: "success",
-          message: `✓ ₹${amount} advance noted for ${emp.name}`,
+          message: `✓ ₹${amount} advance recorded for ${emp.name} (affects payroll)`,
           timestamp: now,
         });
       } else {

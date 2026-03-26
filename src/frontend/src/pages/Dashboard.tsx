@@ -89,7 +89,12 @@ export function Dashboard() {
     // Refresh on storage changes (e.g. when attendance or payroll is saved in another tab)
     const handler = () => load();
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    // Also refresh on same-tab attendance/payroll writes
+    window.addEventListener("clf:attendance-updated", handler);
+    return () => {
+      window.removeEventListener("storage", handler);
+      window.removeEventListener("clf:attendance-updated", handler);
+    };
   }, [load]);
 
   return (
