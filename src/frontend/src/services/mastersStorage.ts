@@ -1,24 +1,28 @@
 /**
  * mastersStorage.ts
  * localStorage-backed CRUD for Trade, Department, Site masters.
- * Completely independent of the ICP canister so it never fails with IC0508.
+ * Tenant-aware: all keys are prefixed with the active company ID.
  */
 import type { Department, Site, Trade } from "../types";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
-const KEYS = {
-  trades: "clf_trades",
-  departments: "clf_departments",
-  sites: "clf_sites",
-  counter: "clf_master_counter",
-};
+function getKeys() {
+  const cid = getActiveCompanyId();
+  return {
+    trades: getTenantKey(cid, "clf_trades"),
+    departments: getTenantKey(cid, "clf_departments"),
+    sites: getTenantKey(cid, "clf_sites"),
+    counter: getTenantKey(cid, "clf_master_counter"),
+  };
+}
 
 function getCounter(): number {
-  return Number.parseInt(localStorage.getItem(KEYS.counter) || "0", 10);
+  return Number.parseInt(localStorage.getItem(getKeys().counter) || "0", 10);
 }
 
 function nextId(): string {
   const c = getCounter() + 1;
-  localStorage.setItem(KEYS.counter, String(c));
+  localStorage.setItem(getKeys().counter, String(c));
   return `local-${c}-${Date.now()}`;
 }
 
@@ -48,7 +52,7 @@ export function getTrades(): { trades: Trade[]; activeTrades: Trade[] } {
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.trades);
+  }>(getKeys().trades);
   const trades: Trade[] = raw.map((r) => ({
     ...r,
     createdAt: BigInt(r.createdAt),
@@ -62,7 +66,7 @@ export function createTrade(name: string): boolean {
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.trades);
+  }>(getKeys().trades);
   if (raw.some((t) => toLower(t.name) === toLower(name))) return false;
   raw.push({
     id: nextId(),
@@ -70,7 +74,7 @@ export function createTrade(name: string): boolean {
     status: "active",
     createdAt: Date.now(),
   });
-  save(KEYS.trades, raw);
+  save(getKeys().trades, raw);
   return true;
 }
 
@@ -80,11 +84,11 @@ export function updateTrade(id: string, name: string, status: string): boolean {
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.trades);
+  }>(getKeys().trades);
   const idx = raw.findIndex((t) => t.id === id);
   if (idx === -1) return false;
   raw[idx] = { ...raw[idx], name: name.trim(), status };
-  save(KEYS.trades, raw);
+  save(getKeys().trades, raw);
   return true;
 }
 
@@ -99,7 +103,7 @@ export function getDepartments(): {
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.departments);
+  }>(getKeys().departments);
   const departments: Department[] = raw.map((r) => ({
     ...r,
     createdAt: BigInt(r.createdAt),
@@ -116,7 +120,7 @@ export function createDepartment(name: string): boolean {
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.departments);
+  }>(getKeys().departments);
   if (raw.some((d) => toLower(d.name) === toLower(name))) return false;
   raw.push({
     id: nextId(),
@@ -124,7 +128,7 @@ export function createDepartment(name: string): boolean {
     status: "active",
     createdAt: Date.now(),
   });
-  save(KEYS.departments, raw);
+  save(getKeys().departments, raw);
   return true;
 }
 
@@ -138,11 +142,11 @@ export function updateDepartment(
     name: string;
     status: string;
     createdAt: number;
-  }>(KEYS.departments);
+  }>(getKeys().departments);
   const idx = raw.findIndex((d) => d.id === id);
   if (idx === -1) return false;
   raw[idx] = { ...raw[idx], name: name.trim(), status };
-  save(KEYS.departments, raw);
+  save(getKeys().departments, raw);
   return true;
 }
 
@@ -160,7 +164,7 @@ type RawSite = {
 };
 
 export function getSites(): { sites: Site[]; activeSites: Site[] } {
-  const raw = load<RawSite>(KEYS.sites);
+  const raw = load<RawSite>(getKeys().sites);
   const sites: Site[] = raw.map((r) => ({
     ...r,
     siteCode: r.siteCode || "",
@@ -176,7 +180,7 @@ export function createSite(
   lng: number,
   radiusMeters: number,
 ): boolean {
-  const raw = load<RawSite>(KEYS.sites);
+  const raw = load<RawSite>(getKeys().sites);
   if (raw.some((s) => toLower(s.name) === toLower(name))) return false;
   raw.push({
     id: nextId(),
@@ -188,7 +192,7 @@ export function createSite(
     radiusMeters,
     createdAt: Date.now(),
   });
-  save(KEYS.sites, raw);
+  save(getKeys().sites, raw);
   return true;
 }
 
@@ -201,7 +205,7 @@ export function updateSite(
   lng: number,
   radiusMeters: number,
 ): boolean {
-  const raw = load<RawSite>(KEYS.sites);
+  const raw = load<RawSite>(getKeys().sites);
   const idx = raw.findIndex((s) => s.id === id);
   if (idx === -1) return false;
   raw[idx] = {
@@ -213,6 +217,6 @@ export function updateSite(
     lng,
     radiusMeters,
   };
-  save(KEYS.sites, raw);
+  save(getKeys().sites, raw);
   return true;
 }

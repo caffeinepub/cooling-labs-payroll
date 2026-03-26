@@ -1,11 +1,12 @@
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import React, { useEffect } from "react";
+import { Toaster } from "../components/ui/sonner";
 import { useAdminAuth } from "../context/AdminAuthContext";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 /** Routes accessible without admin login */
-const PUBLIC_ROUTES = ["/admin/login", "/supervisor"];
+const PUBLIC_ROUTES = ["/admin/login", "/supervisor", "/superadmin"];
 
 export function Layout() {
   const { adminLoggedIn } = useAdminAuth();
@@ -13,20 +14,22 @@ export function Layout() {
   const navigate = useNavigate();
   const pathname = routerState.location.pathname;
 
+  const isSuperAdminRoute = pathname.startsWith("/superadmin");
+
   useEffect(() => {
+    if (isSuperAdminRoute) return; // Super admin handles its own auth
     const isPublic = PUBLIC_ROUTES.some(
       (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
     if (!isPublic && !adminLoggedIn) {
-      // Replace history entry so back button can't return to protected page
       window.history.replaceState(null, "", "/admin/login");
       navigate({ to: "/admin/login" });
     }
-  }, [adminLoggedIn, pathname, navigate]);
+  }, [adminLoggedIn, pathname, navigate, isSuperAdminRoute]);
 
-  // Prevent back button from returning to protected pages after logout
   useEffect(() => {
     const handlePopState = () => {
+      if (pathname.startsWith("/superadmin")) return;
       const isPublic = PUBLIC_ROUTES.some(
         (p) =>
           window.location.pathname === p ||
@@ -39,7 +42,17 @@ export function Layout() {
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [adminLoggedIn, navigate]);
+  }, [adminLoggedIn, navigate, pathname]);
+
+  // Super admin routes render their own full-page layouts
+  if (isSuperAdminRoute) {
+    return (
+      <>
+        <Outlet />
+        <Toaster />
+      </>
+    );
+  }
 
   if (pathname === "/admin/login") {
     return <Outlet />;
@@ -62,6 +75,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

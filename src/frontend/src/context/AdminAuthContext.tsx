@@ -6,6 +6,14 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import {
+  clearCompanySession,
+  getCompanyByCode,
+  getCompanySession,
+  loginCompany,
+  setCompanySession,
+  updateCompany,
+} from "../services/tenantStorage";
 
 export type SessionRole = "admin" | "supervisor" | null;
 
@@ -21,7 +29,11 @@ interface AdminAuthContextType {
   adminLoggedIn: boolean;
   session: SessionUser | null;
   loggingIn: boolean;
-  login: (password: string) => Promise<boolean>;
+  login: (
+    companyCode: string,
+    username: string,
+    password: string,
+  ) => Promise<boolean>;
   loginSupervisor: (user: SessionUser) => void;
   logout: () => void;
   changePassword: (oldPw: string, newPw: string) => Promise<boolean>;
@@ -41,19 +53,14 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   adminName: "Administrator",
 });
 
-const LOGGED_IN_KEY = "adminLoggedIn";
-const PASSWORD_KEY = "adminPassword";
-const ADMIN_NAME_KEY = "adminName";
 const SESSION_KEY = "clf_session";
-const DEFAULT_PASSWORD = "admin123";
-
-function getStoredPassword(): string {
-  return localStorage.getItem(PASSWORD_KEY) || DEFAULT_PASSWORD;
-}
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [adminLoggedIn, setAdminLoggedIn] = useState(() => {
-    return localStorage.getItem(LOGGED_IN_KEY) === "true";
+    // Check both legacy key and new tenant session
+    const companySession = getCompanySession();
+    if (companySession && companySession.role === "company_admin") return true;
+    return localStorage.getItem("adminLoggedIn") === "true";
   });
   const [session, setSession] = useState<SessionUser | null>(() => {
     try {
@@ -65,7 +72,9 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   });
   const [loggingIn, setLoggingIn] = useState(false);
   const [adminName, setAdminName] = useState(() => {
-    return localStorage.getItem(ADMIN_NAME_KEY) || "Administrator";
+    const companySession = getCompanySession();
+    if (companySession) return companySession.username || "Administrator";
+    return localStorage.getItem("adminName") || "Administrator";
   });
 
   // Sync adminLoggedIn from session on mount
@@ -75,42 +84,61 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
-  const login = useCallback(async (password: string): Promise<boolean> => {
-    setLoggingIn(true);
-    try {
-      const stored = getStoredPassword();
-      if (password === stored) {
-        const name = localStorage.getItem(ADMIN_NAME_KEY) || "Administrator";
-        const user: SessionUser = { role: "admin", name };
-        localStorage.setItem(LOGGED_IN_KEY, "true");
+  const login = useCallback(
+    async (
+      companyCode: string,
+      username: string,
+      password: string,
+    ): Promise<boolean> => {
+      setLoggingIn(true);
+      try {
+        const companySession = loginCompany(companyCode, username, password);
+        if (!companySession) return false;
+        const user: SessionUser = { role: "admin", name: username };
+        localStorage.setItem("adminLoggedIn", "true");
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
         setAdminLoggedIn(true);
         setSession(user);
+        setAdminName(username);
         return true;
+      } finally {
+        setLoggingIn(false);
       }
-      return false;
-    } finally {
-      setLoggingIn(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const loginSupervisor = useCallback((user: SessionUser) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     setSession(user);
+    // Also store in company session for tenant-awareness
+    const existing = getCompanySession();
+    if (existing) {
+      setCompanySession({
+        ...existing,
+        role: "supervisor",
+        username: user.username || user.name,
+        siteId: user.siteId,
+      });
+    }
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(LOGGED_IN_KEY);
+    localStorage.removeItem("adminLoggedIn");
     localStorage.removeItem(SESSION_KEY);
+    clearCompanySession();
     setAdminLoggedIn(false);
     setSession(null);
   }, []);
 
   const changePassword = useCallback(
     async (oldPw: string, newPw: string): Promise<boolean> => {
-      const stored = getStoredPassword();
-      if (oldPw !== stored) return false;
-      localStorage.setItem(PASSWORD_KEY, newPw);
+      const companySession = getCompanySession();
+      if (!companySession) return false;
+      const company = getCompanyByCode(companySession.companyCode);
+      if (!company) return false;
+      if (company.adminPassword !== oldPw) return false;
+      updateCompany(company.id, { adminPassword: newPw });
       return true;
     },
     [],
@@ -118,7 +146,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const updateAdminProfile = useCallback(
     (name: string) => {
-      localStorage.setItem(ADMIN_NAME_KEY, name);
+      localStorage.setItem("adminName", name);
       setAdminName(name);
       const current = session;
       if (current?.role === "admin") {

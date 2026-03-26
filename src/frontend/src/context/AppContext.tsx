@@ -91,6 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!adminLoggedIn) return;
     setLoading(true);
     refreshTrades();
     refreshDepartments();
@@ -99,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void refreshSupervisors();
     setLoading(false);
   }, [
+    adminLoggedIn,
     refreshEmployees,
     refreshTrades,
     refreshDepartments,

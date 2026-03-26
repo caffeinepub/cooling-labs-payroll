@@ -1,53 +1,178 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, HardHat, Lock } from "lucide-react";
-import React, { useState, useCallback } from "react";
-import { ToastContainer } from "../components/ui/ToastContainer";
+import { Link } from "@tanstack/react-router";
+import {
+  AlertTriangle,
+  Building2,
+  Eye,
+  EyeOff,
+  HardHat,
+  Lock,
+  User,
+} from "lucide-react";
+import type React from "react";
+import { useCallback, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useAdminAuth } from "../context/AdminAuthContext";
-import { useToast } from "../hooks/useToast";
+import { getCompanyByCode } from "../services/tenantStorage";
+import type { Company } from "../services/tenantStorage";
 
 export function AdminLogin() {
   const { login, loggingIn } = useAdminAuth();
-  const { toasts, addToast, removeToast } = useToast();
   const navigate = useNavigate();
+  const [companyCode, setCompanyCode] = useState("");
+  const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [companyPreview, setCompanyPreview] = useState<Company | null>(null);
+  const [previewLooked, setPreviewLooked] = useState(false);
+
+  const lookupCompany = useCallback((code: string) => {
+    if (code.length >= 3) {
+      const found = getCompanyByCode(code);
+      setCompanyPreview(found);
+      setPreviewLooked(true);
+    } else {
+      setCompanyPreview(null);
+      setPreviewLooked(false);
+    }
+  }, []);
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase();
+    setCompanyCode(val);
+    lookupCompany(val);
+  };
+
+  const handleCodeBlur = () => {
+    lookupCompany(companyCode);
+  };
 
   const handleLogin = useCallback(async () => {
-    if (!password.trim()) {
-      addToast("Enter password", "warning");
+    setError("");
+    if (!companyCode.trim()) {
+      setError("Enter company code");
       return;
     }
-    const ok = await login(password);
+    if (!username.trim()) {
+      setError("Enter username");
+      return;
+    }
+    if (!password.trim()) {
+      setError("Enter password");
+      return;
+    }
+    const ok = await login(
+      companyCode.trim().toUpperCase(),
+      username.trim(),
+      password,
+    );
     if (ok) {
       navigate({ to: "/" });
     } else {
-      addToast("Invalid password", "error");
+      setError("Invalid company code, username, or password");
     }
-  }, [password, login, navigate, addToast]);
+  }, [companyCode, username, password, login, navigate]);
+
+  const displayName =
+    companyPreview?.brandName || companyPreview?.companyName || "";
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const isBlocked =
+    companyPreview &&
+    (companyPreview.status === "suspended" ||
+      companyPreview.status === "inactive");
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3">
             <HardHat className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-lg font-bold text-gray-900">Admin Login</h1>
+          <h1 className="text-lg font-bold text-gray-900">Company Login</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Cooling Labs Payroll System
+            HumanskeyAI Workforce Platform
           </p>
         </div>
+
+        {/* Company preview card */}
+        {previewLooked && companyPreview && (
+          <div
+            className={`mb-4 rounded-xl border p-3 flex items-center gap-3 ${
+              isBlocked
+                ? "border-red-200 bg-red-50"
+                : "border-emerald-200 bg-emerald-50"
+            }`}
+          >
+            {companyPreview.logoDataUrl ? (
+              <img
+                src={companyPreview.logoDataUrl}
+                alt="logo"
+                className="w-10 h-10 rounded-lg object-contain border border-gray-200 bg-white"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">{initials}</span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {displayName}
+              </p>
+              {isBlocked ? (
+                <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
+                  <AlertTriangle className="w-3 h-3" />
+                  {companyPreview.status === "suspended"
+                    ? "Account suspended. Contact platform admin."
+                    : "Account inactive. Contact platform admin."}
+                </p>
+              ) : (
+                <p className="text-xs text-emerald-600 mt-0.5">
+                  Active account
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Username</Label>
-            <Input value="admin" disabled className="bg-gray-50" />
+            <Label htmlFor="company-code">
+              <Building2 className="w-3.5 h-3.5 inline mr-1" />
+              Company Code
+            </Label>
+            <Input
+              id="company-code"
+              data-ocid="admin.login.input"
+              value={companyCode}
+              onChange={handleCodeChange}
+              onBlur={handleCodeBlur}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="e.g. COOLABS"
+              className="uppercase"
+            />
+            <p className="text-xs text-gray-400">Default: COOLABS</p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="admin-pw">Password</Label>
+            <Label htmlFor="admin-username">
+              <User className="w-3.5 h-3.5 inline mr-1" />
+              Username
+            </Label>
+            <Input
+              id="admin-username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="admin"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-pw">
+              <Lock className="w-3.5 h-3.5 inline mr-1" />
+              Password
+            </Label>
             <div className="relative">
               <Input
                 id="admin-pw"
@@ -55,7 +180,7 @@ export function AdminLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                placeholder="Enter admin password"
+                placeholder="Enter password"
               />
               <button
                 type="button"
@@ -69,12 +194,36 @@ export function AdminLogin() {
                 )}
               </button>
             </div>
-            <p className="text-xs text-gray-400">Default password: admin123</p>
+            <p className="text-xs text-gray-400">Default: admin123</p>
           </div>
-          <Button onClick={handleLogin} disabled={loggingIn} className="w-full">
+
+          {error && (
+            <div
+              data-ocid="admin.login.error_state"
+              className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-200"
+            >
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
+          <Button
+            data-ocid="admin.login.submit_button"
+            onClick={handleLogin}
+            disabled={loggingIn || !!isBlocked}
+            className="w-full"
+          >
             <Lock className="w-4 h-4 mr-2" />
             {loggingIn ? "Logging in..." : "Login"}
           </Button>
+        </div>
+        <div className="mt-6 text-center">
+          <Link
+            to="/superadmin/login"
+            className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+          >
+            Platform Admin (HumanskeyAI)? Login here →
+          </Link>
         </div>
       </div>
     </div>

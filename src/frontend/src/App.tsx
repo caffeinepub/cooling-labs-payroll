@@ -16,6 +16,7 @@ import { Employees } from "./pages/Employees";
 import { Masters } from "./pages/Masters";
 import { Payroll } from "./pages/Payroll";
 import { Reports } from "./pages/Reports";
+import { SuperAdminLogin } from "./pages/SuperAdminLogin";
 import { SupervisorView } from "./pages/SupervisorView";
 import { UserManagement } from "./pages/UserManagement";
 import { AttendanceImport } from "./pages/attendance/AttendanceImport";
@@ -23,6 +24,16 @@ import { BulkAttendance } from "./pages/attendance/BulkAttendance";
 import { Regularization } from "./pages/attendance/Regularization";
 import { SingleEntry } from "./pages/attendance/SingleEntry";
 import { WhatsApp } from "./pages/attendance/WhatsApp";
+import { Companies } from "./pages/superadmin/Companies";
+import { SuperAdminDashboard } from "./pages/superadmin/SuperAdminDashboard";
+import {
+  ensureDefaultCompanies,
+  runMigrationIfNeeded,
+} from "./services/tenantStorage";
+
+// Run migration + ensure default companies exist
+runMigrationIfNeeded();
+ensureDefaultCompanies();
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -116,6 +127,22 @@ const approvalsCenterRoute = createRoute({
   path: "/admin/approvals",
   component: ApprovalsCenter,
 });
+// Super Admin routes (render their own full-page layouts)
+const superAdminLoginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/superadmin/login",
+  component: SuperAdminLogin,
+});
+const superAdminDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/superadmin/dashboard",
+  component: SuperAdminDashboard,
+});
+const superAdminCompaniesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/superadmin/companies",
+  component: Companies,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -136,6 +163,9 @@ const routeTree = rootRoute.addChildren([
   adminLoginRoute,
   adminSettingsRoute,
   approvalsCenterRoute,
+  superAdminLoginRoute,
+  superAdminDashboardRoute,
+  superAdminCompaniesRoute,
 ]);
 
 const router = createRouter({ routeTree });

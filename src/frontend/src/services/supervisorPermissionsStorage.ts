@@ -1,12 +1,16 @@
 /**
- * supervisorPermissionsStorage.ts
- * Global default permissions template + per-supervisor overrides.
- * Logic: per-supervisor permissions override global defaults.
+ * supervisorPermissionsStorage.ts — tenant-aware supervisor permissions.
  */
 import type { SupervisorPermissions } from "../types";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
-const GLOBAL_KEY = "clf_supervisor_permissions_global";
-const PER_KEY = "clf_supervisor_permissions";
+function getStorageKeys() {
+  const cid = getActiveCompanyId();
+  return {
+    global: getTenantKey(cid, "clf_supervisor_permissions_global"),
+    per: getTenantKey(cid, "clf_supervisor_permissions"),
+  };
+}
 
 export const DEFAULT_PERMISSIONS: SupervisorPermissions = {
   attendance: {
@@ -44,7 +48,7 @@ export const DEFAULT_PERMISSIONS: SupervisorPermissions = {
 
 export function getGlobalDefaults(): SupervisorPermissions {
   try {
-    const raw = localStorage.getItem(GLOBAL_KEY);
+    const raw = localStorage.getItem(getStorageKeys().global);
     if (!raw) return { ...DEFAULT_PERMISSIONS };
     return JSON.parse(raw) as SupervisorPermissions;
   } catch {
@@ -53,14 +57,14 @@ export function getGlobalDefaults(): SupervisorPermissions {
 }
 
 export function saveGlobalDefaults(p: SupervisorPermissions): void {
-  localStorage.setItem(GLOBAL_KEY, JSON.stringify(p));
+  localStorage.setItem(getStorageKeys().global, JSON.stringify(p));
 }
 
 export function getPermissionsForSupervisor(
   phone: string,
 ): SupervisorPermissions {
   try {
-    const raw = localStorage.getItem(PER_KEY);
+    const raw = localStorage.getItem(getStorageKeys().per);
     if (!raw) return getGlobalDefaults();
     const all = JSON.parse(raw) as Record<string, SupervisorPermissions>;
     return all[phone] ?? getGlobalDefaults();
@@ -74,13 +78,11 @@ export function savePermissionsForSupervisor(
   p: SupervisorPermissions,
 ): void {
   try {
-    const raw = localStorage.getItem(PER_KEY);
+    const raw = localStorage.getItem(getStorageKeys().per);
     const all: Record<string, SupervisorPermissions> = raw
       ? JSON.parse(raw)
       : {};
     all[phone] = p;
-    localStorage.setItem(PER_KEY, JSON.stringify(all));
-  } catch {
-    // ignore
-  }
+    localStorage.setItem(getStorageKeys().per, JSON.stringify(all));
+  } catch {}
 }

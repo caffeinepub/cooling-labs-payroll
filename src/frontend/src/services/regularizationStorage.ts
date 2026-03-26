@@ -1,7 +1,5 @@
 /**
- * regularizationStorage.ts
- * localStorage-backed regularization requests and audit logs.
- * Supports: Status / OT / Advance / Combined correction workflows.
+ * regularizationStorage.ts — tenant-aware regularization requests and audit logs.
  */
 import type { AuditLog, RegularizationRequest } from "../types";
 import { createApprovalRequest } from "./approvalsStorage";
@@ -12,11 +10,15 @@ import {
   updateAttendanceOT,
 } from "./attendanceStorage";
 import { getPayrollWithBreakdown, overwritePayroll } from "./payrollStorage";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
-const KEYS = {
-  requests: "clf_reg_requests",
-  auditLogs: "clf_audit_logs",
-};
+function getKeys() {
+  const cid = getActiveCompanyId();
+  return {
+    requests: getTenantKey(cid, "clf_reg_requests"),
+    auditLogs: getTenantKey(cid, "clf_audit_logs"),
+  };
+}
 
 type RawRequest = Omit<RegularizationRequest, "approvedAt" | "createdAt"> & {
   approvedAt: number;
@@ -28,7 +30,7 @@ type RawLog = Omit<AuditLog, "timestamp"> & { timestamp: number };
 
 function loadRequests(): RawRequest[] {
   try {
-    const raw = localStorage.getItem(KEYS.requests);
+    const raw = localStorage.getItem(getKeys().requests);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -37,12 +39,12 @@ function loadRequests(): RawRequest[] {
 }
 
 function saveRequests(data: RawRequest[]): void {
-  localStorage.setItem(KEYS.requests, JSON.stringify(data));
+  localStorage.setItem(getKeys().requests, JSON.stringify(data));
 }
 
 function loadLogs(): RawLog[] {
   try {
-    const raw = localStorage.getItem(KEYS.auditLogs);
+    const raw = localStorage.getItem(getKeys().auditLogs);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -51,7 +53,7 @@ function loadLogs(): RawLog[] {
 }
 
 function saveLogs(data: RawLog[]): void {
-  localStorage.setItem(KEYS.auditLogs, JSON.stringify(data));
+  localStorage.setItem(getKeys().auditLogs, JSON.stringify(data));
 }
 
 function toRequest(
@@ -72,32 +74,19 @@ function genId(): string {
   return `reg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/**
- * Sync payroll after a regularization approval.
- * Extracts month/year from YYYYMMDD date string.
- * If payroll already exists for that month, regenerates it from updated attendance.
- * Returns true if payroll was recalculated.
- */
 export function syncPayrollAfterApproval(
   _employeeId: string,
   date: string,
 ): boolean {
   try {
-    // date is YYYYMMDD format
     const year = Number.parseInt(date.slice(0, 4), 10);
     const month = Number.parseInt(date.slice(4, 6), 10);
     if (Number.isNaN(month) || Number.isNaN(year)) return false;
-
     const existing = getPayrollWithBreakdown(BigInt(month), BigInt(year));
     if (existing.length === 0) return false;
-
     overwritePayroll(BigInt(month), BigInt(year), "regularization");
-    console.info(
-      `[RegularizationStorage] Payroll recalculated for ${year}/${month} after regularization approval`,
-    );
     return true;
-  } catch (e) {
-    console.error("[RegularizationStorage] syncPayrollAfterApproval failed", e);
+  } catch {
     return false;
   }
 }
@@ -172,7 +161,6 @@ export function createRegularizationRequest(
   });
   saveRequests(requests);
 
-  // Also bridge to unified approval store
   const monthRef = dateStr.slice(0, 6);
   const reqType = opts?.requestType;
   let approvalReqType:
@@ -221,7 +209,6 @@ export function approveRegularizationRequest(
   req.approvedAt = Date.now();
   if (remark) req.approvalRemark = remark;
 
-  // Update matching attendance record
   const m = req.date.slice(4, 6);
   const y = req.date.slice(0, 4);
   const recs = getAttendanceByMonth(m, y);
@@ -231,9 +218,7 @@ export function approveRegularizationRequest(
 
   if (attRec) {
     const reqType = req.requestType ?? "status";
-
     if (reqType === "status" || reqType === "combined") {
-      // Update status (and OT if combined)
       const newOT =
         reqType === "combined" && req.newOtHours !== undefined
           ? req.newOtHours
@@ -246,7 +231,6 @@ export function approveRegularizationRequest(
         approvedBy,
       );
     }
-
     if (reqType === "ot" || reqType === "combined") {
       if (req.newOtHours !== undefined) {
         updateAttendanceOT(
@@ -257,7 +241,6 @@ export function approveRegularizationRequest(
         );
       }
     }
-
     if (reqType === "advance" || reqType === "combined") {
       if (req.newAdvance !== undefined && req.newAdvance >= 0) {
         updateAttendanceAdvance(
@@ -269,10 +252,6 @@ export function approveRegularizationRequest(
       }
     }
   } else {
-    // No existing attendance record — create minimal placeholder for advance/OT corrections
-    console.warn(
-      `[RegularizationStorage] No attendance record found for ${req.employeeId} on ${req.date}. OT/Advance corrections may not fully apply.`,
-    );
     if (req.newAdvance !== undefined && req.newAdvance >= 0) {
       updateAttendanceAdvance(
         req.employeeId,
@@ -286,13 +265,11 @@ export function approveRegularizationRequest(
     }
   }
 
-  // Sync payroll if it already exists for the month
   const payrollRecalculated = syncPayrollAfterApproval(
     req.employeeId,
     req.date,
   );
   req.payrollRecalculated = payrollRecalculated;
-
   saveRequests(requests);
 
   addAuditLog(
@@ -332,11 +309,7 @@ export function rejectRegularizationRequest(
   addAuditLog(
     "regularization",
     id,
-    JSON.stringify({
-      status: req.oldStatus,
-      otHours: req.oldOtHours,
-      advance: req.oldAdvance,
-    }),
+    JSON.stringify({ status: req.oldStatus }),
     "rejected",
     rejectedBy,
     remark ?? "Request rejected",

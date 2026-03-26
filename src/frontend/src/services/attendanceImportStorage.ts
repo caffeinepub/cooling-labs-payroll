@@ -1,7 +1,15 @@
 /**
- * attendanceImportStorage.ts
- * Manages import history and settings for the Attendance Import module.
+ * attendanceImportStorage.ts — tenant-aware attendance import settings and history.
  */
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
+
+function getKeys() {
+  const cid = getActiveCompanyId();
+  return {
+    settings: getTenantKey(cid, "clf_import_settings"),
+    history: getTenantKey(cid, "clf_import_history"),
+  };
+}
 
 export type ImportMode = "smartMerge" | "skip" | "overwrite";
 export type SiteMismatchRule = "warning" | "error";
@@ -17,7 +25,7 @@ export interface ImportSettings {
 export interface ImportHistoryRecord {
   importId: string;
   fileName: string;
-  fileType: string; // "xlsx" or "csv"
+  fileType: string;
   uploadedBy: string;
   uploadedAt: number;
   importMode: ImportMode;
@@ -29,9 +37,6 @@ export interface ImportHistoryRecord {
   siteIds: string[];
 }
 
-const SETTINGS_KEY = "clf_import_settings";
-const HISTORY_KEY = "clf_import_history";
-
 const DEFAULT_SETTINGS: ImportSettings = {
   defaultMode: "smartMerge",
   supervisorCanUpload: false,
@@ -41,7 +46,7 @@ const DEFAULT_SETTINGS: ImportSettings = {
 
 export function getImportSettings(): ImportSettings {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = localStorage.getItem(getKeys().settings);
     if (!raw) return { ...DEFAULT_SETTINGS };
     return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
@@ -51,12 +56,15 @@ export function getImportSettings(): ImportSettings {
 
 export function saveImportSettings(s: Partial<ImportSettings>): void {
   const current = getImportSettings();
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...s }));
+  localStorage.setItem(
+    getKeys().settings,
+    JSON.stringify({ ...current, ...s }),
+  );
 }
 
 export function getImportHistory(): ImportHistoryRecord[] {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    const raw = localStorage.getItem(getKeys().history);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -67,9 +75,8 @@ export function getImportHistory(): ImportHistoryRecord[] {
 export function addImportHistory(record: ImportHistoryRecord): void {
   const history = getImportHistory();
   history.unshift(record);
-  // Keep latest 200 records
   if (history.length > 200) history.splice(200);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  localStorage.setItem(getKeys().history, JSON.stringify(history));
 }
 
 export function getImportHistoryBySites(

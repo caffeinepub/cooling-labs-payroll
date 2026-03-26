@@ -1,352 +1,406 @@
 /**
- * payrollStorage.ts
- * localStorage-backed payroll with locked formula:
- *
- * Full Monthly Gross = Basic + HRA + Conveyance + Special Allow + Other Allow
- * Earned X          = Monthly X / totalDays * paidDays
- * Earned Gross      = Earned Basic + HRA + Conv + Special + Other
- * Final Gross       = Earned Gross + OT Pay
- * PF                = 12% of Earned Basic ONLY
- * ESI               = 0.75% of Final Gross (if applicable & gross <= 21000)
- * PT                = manual
- * Advance           = manual
- * Other Deductions  = manual
- * Net               = Final Gross - PF - ESI - PT - Advance - OtherDed
+ * payrollStorage.ts — tenant-aware payroll engine.
  */
-import type { PayrollBreakdown, PayrollRecord, PayrollSummary } from "../types";
+import type { PayrollRecord, PayrollSummary } from "../types";
 import { getAttendanceByMonth } from "./attendanceStorage";
-import { getEmployees } from "./workforceStorage";
+import { getCompanySettings } from "./companySettings";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
-const KEY = "clf_payroll";
-
-// Extended interface with separated earned components
-export interface PayrollBreakdownExtended extends PayrollBreakdown {
-  fullMonthlyGross: number;
-  earnedBasic: number;
-  earnedHRA: number;
-  earnedAllowances: number;
-  earnedGross: number;
+function getKey(): string {
+  return getTenantKey(getActiveCompanyId(), "clf_payroll");
 }
 
-type RawPayrollRecord = Omit<
-  PayrollRecord,
-  "month" | "year" | "generatedAt"
-> & {
+function getManualDedKey(): string {
+  return getTenantKey(getActiveCompanyId(), "clf_payroll_manual_ded");
+}
+
+/** Round to 2 decimal places */
+export function r2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export interface PayrollBreakdownExtended {
+  record: PayrollRecord;
+  presentDays: number;
+  halfDays: number;
+  lopDays: number;
+  paidDays: number;
+  otHours: number;
+  earnedBasic: number;
+  earnedHra: number;
+  earnedConveyance: number;
+  earnedSpecialAllowance: number;
+  earnedOtherAllowance: number;
+  earnedGross: number;
+  otPay: number;
+  finalGross: number;
+  pfDeduction: number;
+  esiDeduction: number;
+  ptDeduction: number;
+  advanceDeduction: number;
+  otherDeduction: number;
+  totalDeductions: number;
+  netPay: number;
+  totalDaysInMonth: bigint;
+  // Alias fields used by Payroll.tsx
+  earnedHRA: number;
+  earnedAllowances: number;
+  fullMonthlyGross: number;
+}
+
+type RawPayroll = Omit<PayrollRecord, "month" | "year" | "generatedAt"> & {
   month: number;
   year: number;
   generatedAt: number;
-  advanceDeduction?: number;
-  otherDeduction?: number;
 };
 
-type RawBreakdown = Omit<PayrollBreakdown, "totalDaysInMonth" | "record"> & {
-  totalDaysInMonth: number;
-  record: RawPayrollRecord;
-  fullMonthlyGross: number;
-  earnedBasic: number;
-  earnedHRA: number;
-  earnedAllowances: number;
-  earnedGross: number;
-};
-
-function loadRaw(): RawBreakdown[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as RawBreakdown[];
-  } catch {
-    return [];
-  }
-}
-
-function saveRaw(data: RawBreakdown[]): void {
-  localStorage.setItem(KEY, JSON.stringify(data));
-}
-
-const MANUAL_DED_KEY = "clf_payroll_manual_ded";
-
-function loadManualDed(): Record<
+type ManualDedStore = Record<
   string,
-  { pt?: number; advance?: number; otherDed?: number }
-> {
+  { advance: number; pt: number; otherDed: number }
+>;
+
+function manualDedKeyFor(empId: string, month: number, year: number): string {
+  return `${empId}__${month}__${year}`;
+}
+
+function loadManualDeds(): ManualDedStore {
   try {
-    const raw = localStorage.getItem(MANUAL_DED_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(getManualDedKey());
+    return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
 }
 
-function saveManualDed(
-  data: Record<string, { pt?: number; advance?: number; otherDed?: number }>,
-): void {
-  localStorage.setItem(MANUAL_DED_KEY, JSON.stringify(data));
+function saveManualDeds(data: ManualDedStore): void {
+  localStorage.setItem(getManualDedKey(), JSON.stringify(data));
 }
 
-function manualDedKey(empId: string, month: number, year: number): string {
-  return `${empId}_${month}_${year}`;
+function load(): RawPayroll[] {
+  try {
+    const raw = localStorage.getItem(getKey());
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
 }
 
-function toBreakdown(r: RawBreakdown): PayrollBreakdownExtended {
+function saveRaw(records: RawPayroll[]): void {
+  localStorage.setItem(getKey(), JSON.stringify(records));
+}
+
+function toPayrollRecord(r: RawPayroll): PayrollRecord {
   return {
     ...r,
-    totalDaysInMonth: BigInt(r.totalDaysInMonth),
-    record: {
-      ...r.record,
-      month: BigInt(r.record.month),
-      year: BigInt(r.record.year),
-      generatedAt: BigInt(r.record.generatedAt),
-    },
-    fullMonthlyGross: r.fullMonthlyGross ?? 0,
-    earnedBasic: r.earnedBasic ?? 0,
-    earnedHRA: r.earnedHRA ?? 0,
-    earnedAllowances: r.earnedAllowances ?? 0,
-    earnedGross: r.earnedGross ?? 0,
+    month: BigInt(r.month),
+    year: BigInt(r.year),
+    generatedAt: BigInt(r.generatedAt),
   };
 }
 
-export function r2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function daysInMonth(month: number, year: number): number {
+function getDaysInMonth(month: number, year: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-function genId(): string {
-  return `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-/** Recompute net pay from stored fields */
-function recomputeNet(rec: RawPayrollRecord): number {
-  return r2(
-    rec.grossPay -
-      rec.pfDeduction -
-      rec.esiDeduction -
-      (rec.ptDeduction || 0) -
-      (rec.advanceDeduction || 0) -
-      (rec.otherDeduction || 0),
+function computePayrollForEmployee(
+  emp: {
+    id: string;
+    employeeId: string;
+    name: string;
+    basicSalary: number;
+    hra: number;
+    conveyance: number;
+    specialAllowance: number;
+    otherAllowance: number;
+    pfApplicable: boolean;
+    esiApplicable: boolean;
+    salaryMode?: string;
+  },
+  month: number,
+  year: number,
+  settings: ReturnType<typeof getCompanySettings>,
+  manualOverride?: { advance: number; pt: number; otherDed: number },
+): RawPayroll {
+  const attMonth = String(month).padStart(2, "0");
+  const attYear = String(year);
+  const attRecords = getAttendanceByMonth(attMonth, attYear).filter(
+    (r) => r.employeeId === emp.id,
   );
-}
 
-function buildBreakdownsForMonth(
-  monthNum: number,
-  yearNum: number,
-  _generatedBy: string,
-): RawBreakdown[] {
-  const { activeEmployees } = getEmployees();
-  const paddedMonth = String(monthNum).padStart(2, "0");
-  const attendanceRecs = getAttendanceByMonth(paddedMonth, String(yearNum));
-  const totalDays = daysInMonth(monthNum, yearNum);
-  const now = Date.now();
+  let presentDays = 0;
+  let halfDays = 0;
+  let leaveDays = 0;
+  let _weeklyOffDays = 0;
+  let _holidayDays = 0;
+  let lopDays = 0;
+  let totalOTHours = 0;
+  let totalAdvance = 0;
 
-  return activeEmployees.map((emp) => {
-    const empRecs = attendanceRecs.filter((a) => a.employeeId === emp.id);
-    const presentDays = empRecs.filter((a) => a.status === "Present").length;
-    const halfDays = empRecs.filter(
-      (a) => a.status === "HalfDay" || a.status === "Half Day",
-    ).length;
-    const paidLeaveDays = empRecs.filter((a) => a.status === "Leave").length;
-    // Paid Days = Present + HalfDay * 0.5 + PaidLeave
-    const paidDays = presentDays + halfDays * 0.5 + paidLeaveDays;
-    const lopDays = Math.max(
-      0,
-      totalDays - presentDays - halfDays - paidLeaveDays,
-    );
-    const otHours = empRecs.reduce((s, a) => s + (a.otHours || 0), 0);
+  for (const r of attRecords) {
+    const s = (r.status || "").toLowerCase().replace(/\s/g, "");
+    if (s === "present") presentDays++;
+    else if (s === "halfday" || s === "half") halfDays++;
+    else if (s === "leave") leaveDays++;
+    else if (s === "weeklyoff" || s === "wo") _weeklyOffDays++;
+    else if (s === "holiday") _holidayDays++;
+    else if (s === "absent") lopDays++;
+    totalOTHours += r.otHours ?? 0;
+    totalAdvance += r.advanceAmount ?? 0;
+  }
 
-    // --- Full monthly salary structure (as entered) ---
-    const mBasic = emp.basicSalary || 0;
-    const mHRA = emp.hra || 0;
-    const mConv = emp.conveyance || 0;
-    const mSpecial = emp.specialAllowance || 0;
-    const mOther = emp.otherAllowance || 0;
-    const fullMonthlyGross = mBasic + mHRA + mConv + mSpecial + mOther;
+  // workingDays is kept for OT rate reference only (not used in earned ratio anymore)
+  const _workingDays = settings.workingDaysPerMonth || 26;
+  void _workingDays;
+  const paidDays = r2(presentDays + halfDays * 0.5 + leaveDays);
+  const totalDaysInMonth = getDaysInMonth(month, year);
 
-    // --- Earned = monthly / totalDays * paidDays ---
-    const factor = totalDays > 0 ? paidDays / totalDays : 0;
-    const earnedBasic = r2(mBasic * factor);
-    const earnedHRA = r2(mHRA * factor);
-    const earnedConv = r2(mConv * factor);
-    const earnedSpecial = r2(mSpecial * factor);
-    const earnedOther = r2(mOther * factor);
-    const earnedAllowances = r2(earnedConv + earnedSpecial + earnedOther);
-    const earnedGross = r2(earnedBasic + earnedHRA + earnedAllowances);
+  const ratio = totalDaysInMonth > 0 ? paidDays / totalDaysInMonth : 0; // FIX: use calendar days, not workingDaysPerMonth setting
 
-    // --- OT Pay ---
-    const otPay = r2(otHours * (emp.otRate || 0));
+  const earnedBasic = r2(emp.basicSalary * ratio);
+  const earnedHra = r2(emp.hra * ratio);
+  const earnedConveyance = r2((emp.conveyance || 0) * ratio);
+  const earnedSpecialAllowance = r2((emp.specialAllowance || 0) * ratio);
+  const earnedOtherAllowance = r2((emp.otherAllowance || 0) * ratio);
 
-    // --- Final Gross = Earned Gross + OT Pay ---
-    const finalGross = r2(earnedGross + otPay);
+  const earnedGross = r2(
+    earnedBasic +
+      earnedHra +
+      earnedConveyance +
+      earnedSpecialAllowance +
+      earnedOtherAllowance,
+  );
 
-    // --- Deductions ---
-    // PF: 12% of Earned Basic ONLY
-    const pfDeduction = emp.pfApplicable ? r2(earnedBasic * 0.12) : 0;
-    // ESI: 0.75% of Final Gross if applicable and finalGross <= 21000
-    const esiDeduction =
-      emp.esiApplicable && finalGross <= 21000 ? r2(finalGross * 0.0075) : 0;
-    const ptDeduction = 0;
-    // Aggregate advance from attendance records for this employee/month
-    const advanceDeduction = r2(
-      empRecs.reduce(
-        (s, a) =>
-          s + ((a as unknown as { advanceAmount?: number }).advanceAmount ?? 0),
-        0,
-      ),
-    );
-    const otherDeduction = 0;
-    console.debug(
-      `[Payroll] ${emp.name} (${emp.employeeId}): attRecs=${empRecs.length} present=${presentDays} half=${halfDays} leave=${paidLeaveDays} paidDays=${paidDays} OT=${otHours} adv=${advanceDeduction}`,
-    );
+  const dailyRate =
+    totalDaysInMonth > 0 ? emp.basicSalary / totalDaysInMonth : 0; // FIX: OT rate also based on calendar days
+  const hourlyRate = dailyRate / 8;
+  const otPay = r2(
+    totalOTHours * hourlyRate * (settings.otRateMultiplier || 2),
+  );
+  const finalGross = r2(earnedGross + otPay);
 
-    const netPay = r2(
-      finalGross -
-        pfDeduction -
-        esiDeduction -
-        ptDeduction -
-        advanceDeduction -
-        otherDeduction,
-    );
+  const pfRate = (settings.pfEmployeeRate ?? 12) / 100;
+  const esiRate = (settings.esiEmployeeRate ?? 0.75) / 100;
 
-    const record: RawPayrollRecord = {
-      id: genId(),
-      employeeId: emp.id,
-      month: monthNum,
-      year: yearNum,
-      // store earned (prorated) values in record fields
-      basicSalary: earnedBasic,
-      hra: earnedHRA,
-      conveyance: earnedConv,
-      specialAllowance: earnedSpecial,
-      otherAllowance: earnedOther,
-      otAmount: otPay,
-      grossPay: finalGross,
-      pfDeduction,
-      esiDeduction,
-      ptDeduction,
-      advanceDeduction,
+  const pfDeduction = emp.pfApplicable ? r2(earnedBasic * pfRate) : 0;
+  const esiDeduction =
+    emp.esiApplicable && finalGross <= 21000 ? r2(finalGross * esiRate) : 0;
+
+  const ptDeduction =
+    manualOverride?.pt !== undefined
+      ? manualOverride.pt
+      : settings.ptApplicable
+        ? settings.ptAmount
+        : 0;
+  const advanceDeduction =
+    manualOverride?.advance !== undefined
+      ? manualOverride.advance
+      : totalAdvance;
+  const otherDeduction = manualOverride?.otherDed || 0;
+
+  const totalDeductions = r2(
+    pfDeduction +
+      esiDeduction +
+      (ptDeduction ?? 0) +
+      advanceDeduction +
       otherDeduction,
-      netPay,
-      generatedAt: now,
-    };
+  );
+  const netPay = r2(finalGross - totalDeductions);
 
-    return {
-      record,
-      presentDays,
-      halfDays,
-      lopDays,
-      paidDays,
-      otHours,
-      totalDaysInMonth: totalDays,
-      fullMonthlyGross,
-      earnedBasic,
-      earnedHRA,
-      earnedAllowances,
-      earnedGross,
-    };
-  });
+  return {
+    id: `pay-${emp.id}-${month}-${year}`,
+    employeeId: emp.id,
+    month,
+    year,
+    basicSalary: earnedBasic,
+    hra: earnedHra,
+    conveyance: earnedConveyance,
+    specialAllowance: earnedSpecialAllowance,
+    otherAllowance: earnedOtherAllowance,
+    otAmount: otPay,
+    grossPay: r2(finalGross),
+    pfDeduction,
+    esiDeduction,
+    ptDeduction,
+    advanceDeduction,
+    otherDeduction,
+    netPay,
+    generatedAt: Date.now(),
+    // Extended fields stored for breakdown
+    _presentDays: presentDays,
+    _halfDays: halfDays,
+    _lopDays: lopDays,
+    _paidDays: paidDays,
+    _otHours: totalOTHours,
+    _earnedBasic: earnedBasic,
+    _earnedHra: earnedHra,
+    _earnedConveyance: earnedConveyance,
+    _earnedSpecialAllowance: earnedSpecialAllowance,
+    _earnedOtherAllowance: earnedOtherAllowance,
+    _earnedGross: earnedGross,
+    _otPay: otPay,
+    _finalGross: finalGross,
+    _totalDaysInMonth: totalDaysInMonth,
+  } as RawPayroll;
 }
 
+function toBreakdown(r: RawPayroll): PayrollBreakdownExtended {
+  const ext = r as any;
+  return {
+    record: toPayrollRecord(r),
+    presentDays: ext._presentDays ?? 0,
+    halfDays: ext._halfDays ?? 0,
+    lopDays: ext._lopDays ?? 0,
+    paidDays: ext._paidDays ?? 0,
+    otHours: ext._otHours ?? 0,
+    earnedBasic: ext._earnedBasic ?? r.basicSalary,
+    earnedHra: ext._earnedHra ?? r.hra,
+    earnedConveyance: ext._earnedConveyance ?? (r.conveyance || 0),
+    earnedSpecialAllowance:
+      ext._earnedSpecialAllowance ?? (r.specialAllowance || 0),
+    earnedOtherAllowance: ext._earnedOtherAllowance ?? (r.otherAllowance || 0),
+    earnedGross: ext._earnedGross ?? r.grossPay,
+    otPay: ext._otPay ?? r.otAmount,
+    finalGross: ext._finalGross ?? r.grossPay,
+    pfDeduction: r.pfDeduction,
+    esiDeduction: r.esiDeduction,
+    ptDeduction: r.ptDeduction,
+    advanceDeduction: r.advanceDeduction ?? 0,
+    otherDeduction: r.otherDeduction ?? 0,
+    totalDeductions: r2(
+      r.pfDeduction +
+        r.esiDeduction +
+        r.ptDeduction +
+        (r.advanceDeduction ?? 0) +
+        (r.otherDeduction ?? 0),
+    ),
+    netPay: r.netPay,
+    totalDaysInMonth: BigInt(ext._totalDaysInMonth ?? 26),
+    earnedHRA: ext._earnedHra ?? r.hra,
+    earnedAllowances: r2(
+      (ext._earnedConveyance ?? r.conveyance ?? 0) +
+        (ext._earnedSpecialAllowance ?? r.specialAllowance ?? 0) +
+        (ext._earnedOtherAllowance ?? r.otherAllowance ?? 0),
+    ),
+    fullMonthlyGross: ext._finalGross ?? r.grossPay,
+  };
+}
+
+/** Generate payroll for all active employees for a given month/year. Skips if already exists. */
 export function generatePayroll(
   month: bigint,
   year: bigint,
-  _generatedBy: string,
+  _updatedBy: string,
 ): { generatedCount: bigint } {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const existing = loadRaw();
-  const alreadyPresent = new Set(
-    existing
-      .filter((r) => r.record.month === monthNum && r.record.year === yearNum)
-      .map((r) => r.record.employeeId),
-  );
-  const newBreakdowns = buildBreakdownsForMonth(
-    monthNum,
-    yearNum,
-    _generatedBy,
-  ).filter((b) => !alreadyPresent.has(b.record.employeeId));
-  // Apply manual deduction overrides for new records
-  const manualDataGen = loadManualDed();
-  for (const bd of newBreakdowns) {
-    const key = manualDedKey(bd.record.employeeId, monthNum, yearNum);
-    const manual = manualDataGen[key];
-    if (manual) {
-      if (manual.pt !== undefined) bd.record.ptDeduction = manual.pt;
-      if (manual.advance !== undefined)
-        bd.record.advanceDeduction = manual.advance;
-      if (manual.otherDed !== undefined)
-        bd.record.otherDeduction = manual.otherDed;
-      bd.record.netPay = recomputeNet(bd.record);
-    }
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const settings = getCompanySettings();
+  const manualDeds = loadManualDeds();
+
+  // Import employee data dynamically to avoid circular dep
+  let employees: any[] = [];
+  try {
+    const wf = require("./workforceStorage");
+    employees = wf.getEmployees().activeEmployees;
+  } catch {
+    // fallback
+    const raw = localStorage.getItem(
+      getTenantKey(getActiveCompanyId(), "clf_employees"),
+    );
+    if (raw)
+      employees = JSON.parse(raw).filter((e: any) => e.status === "active");
   }
-  saveRaw([...existing, ...newBreakdowns]);
-  return { generatedCount: BigInt(newBreakdowns.length) };
+
+  let generatedCount = 0;
+  const existingIds = new Set(
+    records
+      .filter((r) => r.month === m && r.year === y)
+      .map((r) => r.employeeId),
+  );
+
+  const newRecords: RawPayroll[] = [];
+  for (const emp of employees) {
+    if (existingIds.has(emp.id)) continue;
+    const manual = manualDeds[manualDedKeyFor(emp.id, m, y)];
+    newRecords.push(computePayrollForEmployee(emp, m, y, settings, manual));
+    generatedCount++;
+  }
+
+  if (newRecords.length > 0) {
+    saveRaw([...records, ...newRecords]);
+  }
+  return { generatedCount: BigInt(generatedCount) };
 }
 
+/** Regenerate payroll for all active employees for a given month/year (overwrites existing). */
 export function overwritePayroll(
   month: bigint,
   year: bigint,
-  _generatedBy: string,
+  _updatedBy: string,
 ): { generatedCount: bigint } {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const existing = loadRaw().filter(
-    (r) => !(r.record.month === monthNum && r.record.year === yearNum),
-  );
-  const newBreakdowns = buildBreakdownsForMonth(
-    monthNum,
-    yearNum,
-    _generatedBy,
-  );
-  // Re-apply any manual deduction overrides so they survive regeneration
-  const manualData = loadManualDed();
-  for (const bd of newBreakdowns) {
-    const key = manualDedKey(bd.record.employeeId, monthNum, yearNum);
-    const manual = manualData[key];
-    if (manual) {
-      if (manual.pt !== undefined) bd.record.ptDeduction = manual.pt;
-      if (manual.advance !== undefined)
-        bd.record.advanceDeduction = manual.advance;
-      if (manual.otherDed !== undefined)
-        bd.record.otherDeduction = manual.otherDed;
-      bd.record.netPay = recomputeNet(bd.record);
-    }
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const settings = getCompanySettings();
+  const manualDeds = loadManualDeds();
+
+  let employees: any[] = [];
+  try {
+    const wf = require("./workforceStorage");
+    employees = wf.getEmployees().activeEmployees;
+  } catch {
+    const raw = localStorage.getItem(
+      getTenantKey(getActiveCompanyId(), "clf_employees"),
+    );
+    if (raw)
+      employees = JSON.parse(raw).filter((e: any) => e.status === "active");
   }
-  saveRaw([...existing, ...newBreakdowns]);
-  return { generatedCount: BigInt(newBreakdowns.length) };
+
+  const filtered = records.filter((r) => !(r.month === m && r.year === y));
+  const newRecords: RawPayroll[] = [];
+  for (const emp of employees) {
+    const manual = manualDeds[manualDedKeyFor(emp.id, m, y)];
+    newRecords.push(computePayrollForEmployee(emp, m, y, settings, manual));
+  }
+  saveRaw([...filtered, ...newRecords]);
+  return { generatedCount: BigInt(newRecords.length) };
 }
 
 export function getPayrollWithBreakdown(
   month: bigint,
   year: bigint,
 ): PayrollBreakdownExtended[] {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  return loadRaw()
-    .filter((r) => r.record.month === monthNum && r.record.year === yearNum)
+  const m = Number(month);
+  const y = Number(year);
+  return load()
+    .filter((r) => r.month === m && r.year === y)
     .map(toBreakdown);
 }
 
 export function getPayrollSummary(month: bigint, year: bigint): PayrollSummary {
-  const breakdowns = getPayrollWithBreakdown(month, year);
-  const totalGross = breakdowns.reduce((s, b) => s + b.record.grossPay, 0);
-  const totalDeductions = breakdowns.reduce(
-    (s, b) =>
-      s +
-      b.record.pfDeduction +
-      b.record.esiDeduction +
-      (b.record.ptDeduction || 0) +
-      ((b.record as unknown as RawPayrollRecord).advanceDeduction || 0) +
-      ((b.record as unknown as RawPayrollRecord).otherDeduction || 0),
-    0,
-  );
-  const totalNetPay = breakdowns.reduce((s, b) => s + b.record.netPay, 0);
+  const m = Number(month);
+  const y = Number(year);
+  const recs = load().filter((r) => r.month === m && r.year === y);
+  let totalGross = 0;
+  let totalDeductions = 0;
+  let totalNetPay = 0;
+  for (const r of recs) {
+    totalGross += r.grossPay;
+    totalDeductions += r2(
+      r.pfDeduction +
+        r.esiDeduction +
+        r.ptDeduction +
+        (r.advanceDeduction ?? 0) +
+        (r.otherDeduction ?? 0),
+    );
+    totalNetPay += r.netPay;
+  }
   return {
-    totalEmployees: BigInt(breakdowns.length),
-    totalGross,
-    totalDeductions,
-    totalNetPay,
+    totalEmployees: BigInt(recs.length),
+    totalGross: r2(totalGross),
+    totalDeductions: r2(totalDeductions),
+    totalNetPay: r2(totalNetPay),
   };
 }
 
@@ -366,45 +420,77 @@ export function manualOverridePayroll(
   esiDeduction: number,
   ptDeduction: number,
   _netPayIgnored: number,
-  _changedBy: string,
+  _updatedBy: string,
 ): boolean {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const data = loadRaw();
-  const idx = data.findIndex(
-    (r) =>
-      r.record.employeeId === empId &&
-      r.record.month === monthNum &&
-      r.record.year === yearNum,
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const idx = records.findIndex(
+    (r) => r.employeeId === empId && r.month === m && r.year === y,
   );
-  if (idx === -1) return false;
-  const rec = data[idx].record;
   const earnedGross = r2(
     basicSalary + hra + conveyance + specialAllowance + otherAllowance,
   );
   const finalGross = r2(earnedGross + otAmount);
-  rec.basicSalary = basicSalary;
-  rec.hra = hra;
-  rec.conveyance = conveyance;
-  rec.specialAllowance = specialAllowance;
-  rec.otherAllowance = otherAllowance;
-  rec.otAmount = otAmount;
-  rec.grossPay = finalGross;
-  rec.pfDeduction = pfDeduction;
-  rec.esiDeduction = esiDeduction;
-  rec.ptDeduction = ptDeduction;
-  rec.advanceDeduction = advanceDeduction;
-  rec.otherDeduction = otherDeduction;
-  // Always recompute net pay from formula — never trust frontend input
-  rec.netPay = recomputeNet(rec);
-  // update extended breakdown fields
-  data[idx].earnedBasic = basicSalary;
-  data[idx].earnedHRA = hra;
-  data[idx].earnedAllowances = r2(
-    conveyance + specialAllowance + otherAllowance,
+  const totalDed = r2(
+    pfDeduction +
+      esiDeduction +
+      ptDeduction +
+      advanceDeduction +
+      otherDeduction,
   );
-  data[idx].earnedGross = earnedGross;
-  saveRaw(data);
+  const netPay = r2(finalGross - totalDed);
+
+  const updated: RawPayroll = {
+    ...(idx >= 0
+      ? records[idx]
+      : {
+          id: `pay-${empId}-${m}-${y}`,
+          employeeId: empId,
+          month: m,
+          year: y,
+          generatedAt: Date.now(),
+        }),
+    basicSalary,
+    hra,
+    conveyance,
+    specialAllowance,
+    otherAllowance,
+    otAmount,
+    grossPay: finalGross,
+    pfDeduction,
+    esiDeduction,
+    ptDeduction,
+    advanceDeduction,
+    otherDeduction,
+    netPay,
+    _earnedBasic: basicSalary,
+    _earnedHra: hra,
+    _earnedConveyance: conveyance,
+    _earnedSpecialAllowance: specialAllowance,
+    _earnedOtherAllowance: otherAllowance,
+    _earnedGross: earnedGross,
+    _otPay: otAmount,
+    _finalGross: finalGross,
+  } as unknown as RawPayroll;
+
+  if (idx >= 0) {
+    records[idx] = updated;
+  } else {
+    records.push(updated);
+  }
+  saveRaw(records);
+
+  // Save manual overrides
+  const store = loadManualDeds();
+  const mkey = manualDedKeyFor(empId, m, y);
+  store[mkey] = {
+    advance: advanceDeduction,
+    pt: ptDeduction,
+    otherDed: otherDeduction,
+  };
+  saveManualDeds(store);
+
   return true;
 }
 
@@ -412,26 +498,34 @@ export function setPayrollPT(
   empId: string,
   month: bigint,
   year: bigint,
-  ptAmount: number,
+  pt: number,
 ): boolean {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const data = loadRaw();
-  const idx = data.findIndex(
-    (r) =>
-      r.record.employeeId === empId &&
-      r.record.month === monthNum &&
-      r.record.year === yearNum,
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const idx = records.findIndex(
+    (r) => r.employeeId === empId && r.month === m && r.year === y,
   );
   if (idx === -1) return false;
-  const rec = data[idx].record;
-  rec.ptDeduction = ptAmount;
-  rec.netPay = recomputeNet(rec);
-  saveRaw(data);
-  const manualPT = loadManualDed();
-  const ptKey = manualDedKey(empId, monthNum, yearNum);
-  manualPT[ptKey] = { ...(manualPT[ptKey] ?? {}), pt: ptAmount };
-  saveManualDed(manualPT);
+  const rec = records[idx];
+  const totalDed = r2(
+    rec.pfDeduction +
+      rec.esiDeduction +
+      pt +
+      (rec.advanceDeduction ?? 0) +
+      (rec.otherDeduction ?? 0),
+  );
+  records[idx] = {
+    ...rec,
+    ptDeduction: pt,
+    netPay: r2(rec.grossPay - totalDed),
+  };
+  saveRaw(records);
+  const store = loadManualDeds();
+  const mkey = manualDedKeyFor(empId, m, y);
+  if (!store[mkey]) store[mkey] = { advance: 0, pt: 0, otherDed: 0 };
+  store[mkey].pt = pt;
+  saveManualDeds(store);
   return true;
 }
 
@@ -439,26 +533,34 @@ export function setAdvanceDeduction(
   empId: string,
   month: bigint,
   year: bigint,
-  amount: number,
+  advance: number,
 ): boolean {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const data = loadRaw();
-  const idx = data.findIndex(
-    (r) =>
-      r.record.employeeId === empId &&
-      r.record.month === monthNum &&
-      r.record.year === yearNum,
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const idx = records.findIndex(
+    (r) => r.employeeId === empId && r.month === m && r.year === y,
   );
   if (idx === -1) return false;
-  const rec = data[idx].record;
-  rec.advanceDeduction = amount;
-  rec.netPay = recomputeNet(rec);
-  saveRaw(data);
-  const manualAdv = loadManualDed();
-  const advKey = manualDedKey(empId, monthNum, yearNum);
-  manualAdv[advKey] = { ...(manualAdv[advKey] ?? {}), advance: amount };
-  saveManualDed(manualAdv);
+  const rec = records[idx];
+  const totalDed = r2(
+    rec.pfDeduction +
+      rec.esiDeduction +
+      rec.ptDeduction +
+      advance +
+      (rec.otherDeduction ?? 0),
+  );
+  records[idx] = {
+    ...rec,
+    advanceDeduction: advance,
+    netPay: r2(rec.grossPay - totalDed),
+  };
+  saveRaw(records);
+  const store = loadManualDeds();
+  const mkey = manualDedKeyFor(empId, m, y);
+  if (!store[mkey]) store[mkey] = { advance: 0, pt: 0, otherDed: 0 };
+  store[mkey].advance = advance;
+  saveManualDeds(store);
   return true;
 }
 
@@ -466,28 +568,48 @@ export function setOtherDeduction(
   empId: string,
   month: bigint,
   year: bigint,
-  amount: number,
+  otherDed: number,
 ): boolean {
-  const monthNum = Number(month);
-  const yearNum = Number(year);
-  const data = loadRaw();
-  const idx = data.findIndex(
-    (r) =>
-      r.record.employeeId === empId &&
-      r.record.month === monthNum &&
-      r.record.year === yearNum,
+  const m = Number(month);
+  const y = Number(year);
+  const records = load();
+  const idx = records.findIndex(
+    (r) => r.employeeId === empId && r.month === m && r.year === y,
   );
   if (idx === -1) return false;
-  const rec = data[idx].record;
-  rec.otherDeduction = amount;
-  rec.netPay = recomputeNet(rec);
-  saveRaw(data);
-  const manualOther = loadManualDed();
-  const otherKey = manualDedKey(empId, monthNum, yearNum);
-  manualOther[otherKey] = {
-    ...(manualOther[otherKey] ?? {}),
-    otherDed: amount,
+  const rec = records[idx];
+  const totalDed = r2(
+    rec.pfDeduction +
+      rec.esiDeduction +
+      rec.ptDeduction +
+      (rec.advanceDeduction ?? 0) +
+      otherDed,
+  );
+  records[idx] = {
+    ...rec,
+    otherDeduction: otherDed,
+    netPay: r2(rec.grossPay - totalDed),
   };
-  saveManualDed(manualOther);
+  saveRaw(records);
+  const store = loadManualDeds();
+  const mkey = manualDedKeyFor(empId, m, y);
+  if (!store[mkey]) store[mkey] = { advance: 0, pt: 0, otherDed: 0 };
+  store[mkey].otherDed = otherDed;
+  saveManualDeds(store);
   return true;
+}
+
+/** Get sum of advance for employee in a month (from attendance records) */
+export function getAdvanceSumForEmployee(
+  employeeId: string,
+  month: number,
+  year: number,
+): number {
+  const m = String(month).padStart(2, "0");
+  const y = String(year);
+  const { getAttendanceByMonth: getAtt } = require("./attendanceStorage");
+  const records = getAtt(m, y) as any[];
+  return records
+    .filter((r) => r.employeeId === employeeId)
+    .reduce((s, r) => s + (r.advanceAmount || 0), 0);
 }

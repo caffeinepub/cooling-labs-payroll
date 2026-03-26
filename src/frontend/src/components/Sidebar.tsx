@@ -9,7 +9,6 @@ import {
   Database,
   Edit3,
   FileText,
-  HardHat,
   IndianRupee,
   LayoutDashboard,
   MessageSquare,
@@ -24,6 +23,8 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import * as approvalsStorage from "../services/approvalsStorage";
+import { getCompanyByCode, getCompanySession } from "../services/tenantStorage";
+import type { Company } from "../services/tenantStorage";
 
 const navBase =
   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150";
@@ -72,6 +73,19 @@ export function Sidebar() {
   const router = useRouterState();
   const pathname = router.location.pathname;
   const [pendingCount, setPendingCount] = useState(0);
+  const [companyRecord, setCompanyRecord] = useState<Company | null>(null);
+
+  // Get company session and resolve company record for branding
+  const companySession = getCompanySession();
+  const companyName =
+    companyRecord?.brandName || companySession?.companyName || "Cooling Labs";
+
+  useEffect(() => {
+    if (companySession?.companyCode) {
+      const record = getCompanyByCode(companySession.companyCode);
+      setCompanyRecord(record);
+    }
+  }, [companySession?.companyCode]);
 
   const toggleAtt = useCallback(() => setAttOpen((p) => !p), []);
   const toggleMasters = useCallback(() => setMastersOpen((p) => !p), []);
@@ -91,6 +105,8 @@ export function Sidebar() {
     };
   }, [isAdmin]);
 
+  const initials = companyName.slice(0, 2).toUpperCase();
+
   return (
     <div
       className="w-64 min-h-screen flex flex-col"
@@ -100,16 +116,22 @@ export function Sidebar() {
     >
       <div className="px-5 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-            <HardHat className="w-5 h-5 text-white" />
-          </div>
+          {companyRecord?.logoDataUrl ? (
+            <img
+              src={companyRecord.logoDataUrl}
+              alt="logo"
+              className="w-9 h-9 rounded-lg object-contain border border-white/20 bg-white/5"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">{initials}</span>
+            </div>
+          )}
           <div>
             <p className="text-white font-bold text-sm leading-none">
-              Cooling Labs
+              {companyName}
             </p>
-            <p className="text-slate-400 text-xs mt-0.5">
-              Construction Workforce
-            </p>
+            <p className="text-slate-400 text-xs mt-0.5">Workforce Platform</p>
           </div>
         </div>
       </div>

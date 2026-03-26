@@ -1,21 +1,22 @@
 /**
- * approvalsStorage.ts
- * Unified approval request store for all supervisor-submitted requests.
- * All payroll-impact changes must go through this store before being applied.
+ * approvalsStorage.ts — tenant-aware unified approval request store.
  */
 import type { ApprovalRequest } from "../types";
 import {
+  getAttendanceByMonth,
   regularizeAttendance,
   updateAttendanceAdvance,
   updateAttendanceOT,
 } from "./attendanceStorage";
-import { getAttendanceByMonth } from "./attendanceStorage";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
-const KEY = "clf_approval_requests";
+function getKey(): string {
+  return getTenantKey(getActiveCompanyId(), "clf_approval_requests");
+}
 
 function load(): ApprovalRequest[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(getKey());
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -24,19 +25,16 @@ function load(): ApprovalRequest[] {
 }
 
 function save(data: ApprovalRequest[]): void {
-  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(getKey(), JSON.stringify(data));
   try {
     window.dispatchEvent(new CustomEvent("clf:attendance-updated"));
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function genId(): string {
   return `apr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** Find an attendance record for a given employeeId + dateStr (YYYYMMDD) */
 function findAttRecord(employeeId: string, dateStr: string) {
   const m = dateStr.slice(4, 6);
   const y = dateStr.slice(0, 4);
@@ -90,7 +88,6 @@ export function approveRequest(
   if (idx === -1) return false;
   const req = requests[idx];
 
-  // Apply to actual attendance records
   const attRec = findAttRecord(req.employeeId, req.date);
 
   if (
@@ -108,19 +105,11 @@ export function approveRequest(
       if (newAdv > 0) {
         updateAttendanceAdvance(req.employeeId, req.date, newAdv, approvedBy);
       }
-    } else {
-      console.warn(
-        `[ApprovalsStorage] approveRequest: no att record for ${req.employeeId} ${req.date}`,
-      );
     }
   } else if (req.requestType === "ot_request") {
     const newOT = (req.newValue.otHours as number) ?? 0;
     if (attRec) {
       updateAttendanceOT(req.employeeId, req.date, newOT, approvedBy);
-    } else {
-      console.warn(
-        `[ApprovalsStorage] approveRequest: no att record for OT ${req.employeeId} ${req.date}`,
-      );
     }
   } else if (req.requestType === "advance_request") {
     const newAdv =
