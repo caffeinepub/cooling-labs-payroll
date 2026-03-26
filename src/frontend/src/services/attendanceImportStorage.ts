@@ -17,6 +17,7 @@ export interface ImportSettings {
 export interface ImportHistoryRecord {
   importId: string;
   fileName: string;
+  fileType: string; // "xlsx" or "csv"
   uploadedBy: string;
   uploadedAt: number;
   importMode: ImportMode;

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Download,
   FileSpreadsheet,
   History,
   Info,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import { useAppContext } from "../../context/AppContext";
 import {
@@ -35,12 +37,13 @@ import type { Employee, Site } from "../../types";
 // ---------------------------------------------------------------------------
 interface ParsedRow {
   rowNum: number;
-  rawDate: string;
+  rawDate: unknown;
   normalizedDate: string | null;
   siteCode: string;
   siteName: string;
   employeeId: string;
   employeeName: string;
+  rawStatus: string;
   normalizedStatus: string | null;
   otHours: number;
   advance: number;
@@ -63,26 +66,89 @@ const VALID_STATUSES = [
   "Holiday",
 ];
 
-function normalizeDate(raw: string): string | null {
-  const dmyMatch = String(raw).match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
-  if (dmyMatch) {
-    const [, d, m, y] = dmyMatch;
+const STATUS_ALIASES: Record<string, string> = {
+  present: "Present",
+  p: "Present",
+  absent: "Absent",
+  a: "Absent",
+  "half day": "Half Day",
+  halfday: "Half Day",
+  hd: "Half Day",
+  half: "Half Day",
+  leave: "Leave",
+  l: "Leave",
+  "weekly off": "Weekly Off",
+  weeklyoff: "Weekly Off",
+  wo: "Weekly Off",
+  holiday: "Holiday",
+  h: "Holiday",
+};
+
+// ---------------------------------------------------------------------------
+// Normalizers
+// ---------------------------------------------------------------------------
+function normalizeDate(raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+
+  // Excel serial date (number)
+  if (typeof raw === "number") {
+    const excelEpoch = new Date(1899, 11, 30);
+    const d = new Date(excelEpoch.getTime() + raw * 86400000);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}${m}${dd}`;
+  }
+
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  const dmy4 = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if (dmy4) {
+    const [, d, m, y] = dmy4;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (Number.isNaN(date.getTime()) || date.getDate() !== Number(d))
+      return null;
     return `${y}${m.padStart(2, "0")}${d.padStart(2, "0")}`;
   }
-  const ymdMatch = String(raw).match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
-  if (ymdMatch) {
-    const [, y, m, d] = ymdMatch;
+
+  // YYYY-MM-DD
+  const ymd = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (Number.isNaN(date.getTime()) || date.getDate() !== Number(d))
+      return null;
     return `${y}${m.padStart(2, "0")}${d.padStart(2, "0")}`;
   }
+
+  // DD-MM-YY (2-digit year -> 2000+)
+  const dmy2 = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);
+  if (dmy2) {
+    const [, d, m, yy] = dmy2;
+    const y = 2000 + Number(yy);
+    const date = new Date(y, Number(m) - 1, Number(d));
+    if (Number.isNaN(date.getTime()) || date.getDate() !== Number(d))
+      return null;
+    return `${y}${m.padStart(2, "0")}${d.padStart(2, "0")}`;
+  }
+
   return null;
 }
 
-function normalizeStatus(raw: string): string | null {
-  const trimmed = String(raw).trim();
-  return (
-    VALID_STATUSES.find((s) => s.toLowerCase() === trimmed.toLowerCase()) ??
-    null
-  );
+function normalizeStatus(raw: unknown): string | null {
+  if (!raw) return null;
+  const key = String(raw).trim().toLowerCase();
+  return STATUS_ALIASES[key] ?? null;
+}
+
+function parseNumeric(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return 0;
+  const n = Number(raw);
+  if (Number.isNaN(n)) return null;
+  return n;
 }
 
 function formatDate(yyyymmdd: string): string {
@@ -99,7 +165,55 @@ function shortId(id: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// CSV parsing helpers
+// Header mapping
+// ---------------------------------------------------------------------------
+const HEADER_ALIASES: Record<string, string[]> = {
+  date: ["date"],
+  siteCode: ["site code", "sitecode", "site_code", "site id", "siteid"],
+  siteName: ["site name", "sitename", "site_name"],
+  employeeId: [
+    "employee id",
+    "employeeid",
+    "emp id",
+    "empid",
+    "employee_id",
+    "emp_id",
+  ],
+  employeeName: [
+    "employee name",
+    "employeename",
+    "emp name",
+    "empname",
+    "name",
+    "employee_name",
+  ],
+  status: ["status"],
+  otHours: ["ot hours", "othours", "ot", "overtime", "ot hrs", "ot_hours"],
+  advance: ["advance", "advance amount", "advance_amount"],
+  remarks: ["remarks", "remark", "notes", "note"],
+};
+
+function mapHeaders(headerRow: (string | number)[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  const normalized = headerRow.map((h) =>
+    String(h ?? "")
+      .trim()
+      .toLowerCase(),
+  );
+  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    for (const alias of aliases) {
+      const idx = normalized.indexOf(alias);
+      if (idx !== -1) {
+        result[field] = idx;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// CSV helpers
 // ---------------------------------------------------------------------------
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
@@ -123,18 +237,6 @@ function parseCsvLine(line: string): string[] {
   return result;
 }
 
-function parseCsvText(text: string): string[][] {
-  // Remove BOM if present
-  const cleaned = text.replace(/^\uFEFF/, "");
-  return cleaned
-    .split(/\r?\n/)
-    .filter((l) => l.trim())
-    .map(parseCsvLine);
-}
-
-// ---------------------------------------------------------------------------
-// Template download (CSV)
-// ---------------------------------------------------------------------------
 function escapeCsv(val: unknown): string {
   const s = String(val ?? "");
   if (s.includes(",") || s.includes('"') || s.includes("\n")) {
@@ -143,7 +245,158 @@ function escapeCsv(val: unknown): string {
   return s;
 }
 
-function downloadTemplate() {
+// ---------------------------------------------------------------------------
+// Template download — Excel
+// ---------------------------------------------------------------------------
+function downloadExcelTemplate() {
+  const headers = [
+    "Date",
+    "Site Code",
+    "Site Name",
+    "Employee ID",
+    "Employee Name",
+    "Status",
+    "OT Hours",
+    "Advance",
+    "Remarks",
+  ];
+  const sampleRows = [
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE001",
+      "Siddhant Kumar",
+      "Present",
+      2,
+      0,
+      "-",
+    ],
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE002",
+      "Vikalp Kumar",
+      "Leave",
+      0,
+      0,
+      "Sick leave",
+    ],
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE003",
+      "Deepal Arora",
+      "Present",
+      1.5,
+      500,
+      "Advance paid",
+    ],
+  ];
+
+  const data = [headers, ...sampleRows];
+  const ws1 = XLSX.utils.aoa_to_sheet(data);
+
+  // Column widths
+  ws1["!cols"] = [
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 20 },
+  ];
+
+  // Freeze top row
+  ws1["!sheetViews"] = [{ state: "frozen", ySplit: 1 }];
+
+  // Bold header cells
+  for (let c = 0; c < headers.length; c++) {
+    const cellAddr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws1[cellAddr]) {
+      ws1[cellAddr].s = { font: { bold: true } };
+    }
+  }
+
+  // Instructions sheet
+  const instructionRows = [
+    ["ATTENDANCE IMPORT - INSTRUCTIONS"],
+    [""],
+    ["1. Do not change column headers"],
+    ["2. One row = one employee for one date"],
+    ["3. Use Employee ID exactly as shown in the system"],
+    [
+      "4. Allowed Status values: Present, Absent, Half Day, Leave, Weekly Off, Holiday",
+    ],
+    ["5. Also accepted: P, A, HD, Half, L, WO, H"],
+    ["6. Leave OT Hours blank or 0 if not applicable"],
+    ["7. Leave Advance blank or 0 if not applicable"],
+    ["8. Save and upload as .xlsx (recommended) or .csv"],
+    [""],
+    ["SAMPLE ROWS:"],
+    [
+      "Date",
+      "Site Code",
+      "Site Name",
+      "Employee ID",
+      "Employee Name",
+      "Status",
+      "OT Hours",
+      "Advance",
+      "Remarks",
+    ],
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE001",
+      "Siddhant Kumar",
+      "Present",
+      "2",
+      "0",
+      "-",
+    ],
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE002",
+      "Vikalp Kumar",
+      "Leave",
+      "0",
+      "0",
+      "Sick leave",
+    ],
+    [
+      "25-03-2026",
+      "CL001",
+      "Cooling Labs Gurgaon",
+      "CLE003",
+      "Deepal Arora",
+      "Present",
+      "1.5",
+      "500",
+      "Advance paid",
+    ],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(instructionRows);
+  ws2["!cols"] = [{ wch: 60 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, "Attendance Import");
+  XLSX.utils.book_append_sheet(wb, ws2, "Instructions");
+  XLSX.writeFile(wb, "HumanskeyAI_Attendance_Template.xlsx");
+}
+
+// ---------------------------------------------------------------------------
+// Template download — CSV
+// ---------------------------------------------------------------------------
+function downloadCsvTemplate() {
   const headers = [
     "Date",
     "Site Code",
@@ -198,7 +451,48 @@ function downloadTemplate() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "CoolingLabs_Attendance_Template.csv";
+  a.download = "HumanskeyAI_Attendance_Template.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// Error report download
+// ---------------------------------------------------------------------------
+function downloadErrorReport(rows: ParsedRow[]) {
+  const headers = [
+    "Row No.",
+    "Date",
+    "Employee ID",
+    "Employee Name",
+    "Status",
+    "OT Hours",
+    "Advance",
+    "Validation Result",
+    "Reason",
+  ];
+  const dataRows = rows.map((r) => [
+    r.rowNum,
+    r.normalizedDate ? formatDate(r.normalizedDate) : String(r.rawDate ?? ""),
+    r.employeeId,
+    r.resolvedEmployee?.name ?? r.employeeName,
+    r.normalizedStatus ?? r.rawStatus,
+    r.otHours,
+    r.advance,
+    r.validationStatus,
+    r.validationNotes.join("; "),
+  ]);
+  const csvRows = [headers, ...dataRows]
+    .map((r) => r.map(escapeCsv).join(","))
+    .join("\r\n");
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + csvRows], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "AttendanceImport_ErrorReport.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -256,6 +550,7 @@ export function AttendanceImport() {
   );
   const [parsedRows, setParsedRows] = useState<ParsedRow[] | null>(null);
   const [fileName, setFileName] = useState("");
+  const [fileExt, setFileExt] = useState("csv");
   const [skipErrors, setSkipErrors] = useState(false);
   const [importing, setImporting] = useState(false);
   const [history, setHistory] = useState<ImportHistoryRecord[]>(() => {
@@ -275,12 +570,34 @@ export function AttendanceImport() {
       setParsedRows(null);
       setSkipErrors(false);
 
-      let rawRows: string[][];
+      const ext = (file.name.split(".").pop() ?? "csv").toLowerCase();
+      setFileExt(ext);
+
+      let rawRows: (string | number)[][];
+
       try {
-        const text = await file.text();
-        rawRows = parseCsvText(text);
+        if (ext === "xlsx" || ext === "xls") {
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(buf, { type: "array", cellDates: false });
+          const wsName = wb.SheetNames[0];
+          const ws = wb.Sheets[wsName];
+          rawRows = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: "",
+          }) as (string | number)[][];
+        } else {
+          // CSV — handle BOM and various line endings
+          const text = await file.text();
+          const cleaned = text.replace(/^\uFEFF/, "");
+          rawRows = cleaned
+            .split(/\r?\n/)
+            .filter((l) => l.trim())
+            .map(parseCsvLine);
+        }
       } catch {
-        toast.error("Could not read file. Please upload a valid .csv file.");
+        toast.error(
+          "Could not read file. Please upload a valid .xlsx or .csv file.",
+        );
         return;
       }
 
@@ -289,34 +606,12 @@ export function AttendanceImport() {
         return;
       }
 
-      const headerRow = rawRows[0].map((h) => h.toLowerCase().trim());
-      const col = (names: string[]): number => {
-        for (const n of names) {
-          const idx = headerRow.indexOf(n);
-          if (idx !== -1) return idx;
-        }
-        return -1;
-      };
-
-      const colDate = col(["date"]);
-      const colSiteCode = col(["site code", "sitecode"]);
-      const colSiteName = col(["site name", "sitename"]);
-      const colEmpId = col(["employee id", "employeeid", "emp id", "empid"]);
-      const colEmpName = col([
-        "employee name",
-        "employeename",
-        "emp name",
-        "empname",
-      ]);
-      const colStatus = col(["status"]);
-      const colOT = col(["ot hours", "othours", "ot"]);
-      const colAdvance = col(["advance"]);
-      const colRemarks = col(["remarks", "remark", "note", "notes"]);
+      const colMap = mapHeaders(rawRows[0]);
 
       const missing: string[] = [];
-      if (colDate === -1) missing.push("Date");
-      if (colEmpId === -1) missing.push("Employee ID");
-      if (colStatus === -1) missing.push("Status");
+      if (colMap.date === undefined) missing.push("Date");
+      if (colMap.employeeId === undefined) missing.push("Employee ID");
+      if (colMap.status === undefined) missing.push("Status");
 
       if (missing.length > 0) {
         toast.error(
@@ -347,12 +642,12 @@ export function AttendanceImport() {
 
       const dataRows = rawRows.slice(1).filter((r) => r.some((c) => c !== ""));
 
-      // Dup detection pass
+      // Duplicate detection pass within file
       const fileDupTracker = new Map<string, number[]>();
       for (let i = 0; i < dataRows.length; i++) {
         const r = dataRows[i];
-        const empId = r[colEmpId]?.trim() ?? "";
-        const nd = normalizeDate(r[colDate]?.trim() ?? "");
+        const empId = String(r[colMap.employeeId] ?? "").trim();
+        const nd = normalizeDate(r[colMap.date]);
         if (empId && nd) {
           const key = `${empId.toLowerCase()}_${nd}`;
           if (!fileDupTracker.has(key)) fileDupTracker.set(key, []);
@@ -360,11 +655,11 @@ export function AttendanceImport() {
         }
       }
 
-      // System dups
+      // Pre-collect system dup keys
       const allKeys: string[] = [];
       for (const r of dataRows) {
-        const empId = r[colEmpId]?.trim() ?? "";
-        const nd = normalizeDate(r[colDate]?.trim() ?? "");
+        const empId = String(r[colMap.employeeId] ?? "").trim();
+        const nd = normalizeDate(r[colMap.date]);
         const resolvedEmp = empById.get(empId.toLowerCase());
         if (resolvedEmp && nd) allKeys.push(`${resolvedEmp.employeeId}_${nd}`);
       }
@@ -374,32 +669,49 @@ export function AttendanceImport() {
 
       for (let i = 0; i < dataRows.length; i++) {
         const r = dataRows[i];
-        const rawDate = r[colDate]?.trim() ?? "";
-        const siteCode =
-          colSiteCode !== -1 ? (r[colSiteCode]?.trim() ?? "") : "";
-        const siteName =
-          colSiteName !== -1 ? (r[colSiteName]?.trim() ?? "") : "";
-        const employeeId = r[colEmpId]?.trim() ?? "";
-        const employeeName =
-          colEmpName !== -1 ? (r[colEmpName]?.trim() ?? "") : "";
-        const rawStatus = r[colStatus]?.trim() ?? "";
-        const rawOT = colOT !== -1 ? (r[colOT]?.trim() ?? "0") : "0";
-        const rawAdv = colAdvance !== -1 ? (r[colAdvance]?.trim() ?? "0") : "0";
-        const remarks = colRemarks !== -1 ? (r[colRemarks]?.trim() ?? "") : "";
 
-        const nd = normalizeDate(rawDate);
-        const normStatus = normalizeStatus(rawStatus);
-        const otHours = Number.isNaN(Number(rawOT)) ? -1 : Number(rawOT);
-        const advance = Number.isNaN(Number(rawAdv)) ? -1 : Number(rawAdv);
+        const rawDateCell = r[colMap.date];
+        const siteCode =
+          colMap.siteCode !== undefined
+            ? String(r[colMap.siteCode] ?? "").trim()
+            : "";
+        const siteName =
+          colMap.siteName !== undefined
+            ? String(r[colMap.siteName] ?? "").trim()
+            : "";
+        const employeeId = String(r[colMap.employeeId] ?? "").trim();
+        const employeeName =
+          colMap.employeeName !== undefined
+            ? String(r[colMap.employeeName] ?? "").trim()
+            : "";
+        const rawStatusVal = String(r[colMap.status] ?? "").trim();
+        const rawOTCell =
+          colMap.otHours !== undefined ? r[colMap.otHours] : undefined;
+        const rawAdvCell =
+          colMap.advance !== undefined ? r[colMap.advance] : undefined;
+        const remarks =
+          colMap.remarks !== undefined
+            ? String(r[colMap.remarks] ?? "").trim()
+            : "";
+
+        const nd = normalizeDate(rawDateCell);
+        const normStatus = normalizeStatus(rawStatusVal);
+        const otResult = parseNumeric(rawOTCell !== undefined ? rawOTCell : "");
+        const advResult = parseNumeric(
+          rawAdvCell !== undefined ? rawAdvCell : "",
+        );
+        const otHours = otResult ?? -1;
+        const advance = advResult ?? -1;
 
         const notes: string[] = [];
         let vStatus: "valid" | "warning" | "error" = "valid";
 
-        if (!rawDate) {
+        const rawDateStr = String(rawDateCell ?? "").trim();
+        if (!rawDateStr && rawDateCell === "") {
           notes.push("Missing Date");
           vStatus = "error";
         } else if (!nd) {
-          notes.push(`Invalid date format: "${rawDate}"`);
+          notes.push(`Invalid date format: "${rawDateStr || rawDateCell}"`);
           vStatus = "error";
         }
 
@@ -444,18 +756,20 @@ export function AttendanceImport() {
           resolvedEmp.site !== resolvedSite.id
         ) {
           notes.push(
-            `Site mismatch: employee assigned to "${siteById.get(resolvedEmp.site)?.name ?? resolvedEmp.site}", file says "${resolvedSite.name}"`,
+            `Site mismatch: employee assigned to "${
+              siteById.get(resolvedEmp.site)?.name ?? resolvedEmp.site
+            }", file says "${resolvedSite.name}"`,
           );
           if (importSettings.siteMismatchRule === "error") vStatus = "error";
           else if (vStatus === "valid") vStatus = "warning";
         }
 
-        if (!rawStatus) {
+        if (!rawStatusVal) {
           notes.push("Missing Status");
           vStatus = "error";
         } else if (!normStatus) {
           notes.push(
-            `Invalid status: "${rawStatus}". Use: ${VALID_STATUSES.join(", ")}`,
+            `Invalid status: "${rawStatusVal}". Use: ${VALID_STATUSES.join(", ")} (or aliases P, A, HD, L, WO, H)`,
           );
           vStatus = "error";
         }
@@ -502,12 +816,13 @@ export function AttendanceImport() {
 
         rows.push({
           rowNum: i + 2,
-          rawDate,
+          rawDate: rawDateCell,
           normalizedDate: nd,
           siteCode,
           siteName,
           employeeId,
           employeeName,
+          rawStatus: rawStatusVal,
           normalizedStatus: normStatus,
           otHours: otHours >= 0 ? otHours : 0,
           advance: advance >= 0 ? advance : 0,
@@ -573,7 +888,8 @@ export function AttendanceImport() {
         .length,
       errors: recomputedRows.filter((r) => r.validationStatus === "error")
         .length,
-      dupes: recomputedRows.filter((r) => r.existsInSystem).length,
+      dupeInFile: recomputedRows.filter((r) => r.isDuplicateInFile).length,
+      dupeInSystem: recomputedRows.filter((r) => r.existsInSystem).length,
     };
   }, [recomputedRows]);
 
@@ -582,6 +898,11 @@ export function AttendanceImport() {
   const importableRows =
     recomputedRows?.filter(
       (r) => r.importAction !== "error" && r.importAction !== "skip",
+    ) ?? [];
+
+  const errorOrWarnRows =
+    recomputedRows?.filter(
+      (r) => r.validationStatus === "error" || r.validationStatus === "warning",
     ) ?? [];
 
   // ---------------------------------------------------------------------------
@@ -681,10 +1002,11 @@ export function AttendanceImport() {
 
     const uploadedBy = isAdmin
       ? adminName
-      : ((supervisorSession as any)?.name ?? "Supervisor");
+      : ((supervisorSession as { name?: string } | null)?.name ?? "Supervisor");
     const histRecord: ImportHistoryRecord = {
       importId: `imp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       fileName,
+      fileType: fileExt,
       uploadedBy,
       uploadedAt: Date.now(),
       importMode: selectedMode,
@@ -722,6 +1044,7 @@ export function AttendanceImport() {
     recomputedRows,
     canImport,
     fileName,
+    fileExt,
     selectedMode,
     isAdmin,
     adminName,
@@ -782,15 +1105,28 @@ export function AttendanceImport() {
     return "";
   };
 
+  const fileTypeBadge = (ft: string) => {
+    const isXlsx = ft === "xlsx" || ft === "xls";
+    return (
+      <span
+        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+          isXlsx ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+        }`}
+      >
+        {ft.toUpperCase()}
+      </span>
+    );
+  };
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
     <div className="space-y-6" data-ocid="attendance_import.page">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
             <Upload className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -798,19 +1134,38 @@ export function AttendanceImport() {
               Attendance Import
             </h2>
             <p className="text-sm text-gray-500">
-              Import attendance records from CSV files
+              Import attendance from Excel (.xlsx) or CSV — Excel recommended
+              for best compatibility
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={downloadTemplate}
-          data-ocid="attendance_import.secondary_button"
-        >
-          <FileSpreadsheet className="w-4 h-4 mr-2" />
-          Download Template (.csv)
-        </Button>
+
+        {/* Template download buttons */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={downloadExcelTemplate}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-ocid="attendance_import.primary_button"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+              Download Excel Template (.xlsx)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadCsvTemplate}
+              data-ocid="attendance_import.secondary_button"
+            >
+              <Download className="w-4 h-4 mr-1.5" />
+              Download CSV Template
+            </Button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Use Excel (.xlsx) for best compatibility with Microsoft Office
+          </p>
+        </div>
       </div>
 
       {/* Upload Section */}
@@ -819,7 +1174,7 @@ export function AttendanceImport() {
           <h3 className="text-sm font-semibold text-gray-700">
             Upload Attendance File
           </h3>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: file upload dropzone uses hidden input */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: file upload dropzone */}
           <div
             className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
             onDrop={handleDrop}
@@ -832,7 +1187,7 @@ export function AttendanceImport() {
               Click or drag & drop to upload
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Accepts .csv — use the template above
+              Drag & drop or click — accepts .xlsx (recommended) and .csv
             </p>
             {fileName && (
               <p className="mt-2 text-xs text-blue-600 font-medium">
@@ -843,7 +1198,7 @@ export function AttendanceImport() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".xlsx,.xls,.csv"
             className="hidden"
             onChange={handleFileChange}
             data-ocid="attendance_import.upload_button"
@@ -914,7 +1269,7 @@ export function AttendanceImport() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
             {
               label: "Total Rows",
@@ -937,8 +1292,13 @@ export function AttendanceImport() {
               cls: "bg-red-50 border-red-200 text-red-700",
             },
             {
+              label: "Dup in File",
+              value: summary.dupeInFile,
+              cls: "bg-orange-50 border-orange-200 text-orange-700",
+            },
+            {
               label: "Exist in System",
-              value: summary.dupes,
+              value: summary.dupeInSystem,
               cls: "bg-blue-50 border-blue-200 text-blue-700",
             },
           ].map((c) => (
@@ -960,7 +1320,18 @@ export function AttendanceImport() {
             <h3 className="text-sm font-semibold text-gray-700">
               Parsed Preview ({recomputedRows.length} rows)
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              {errorOrWarnRows.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadErrorReport(errorOrWarnRows)}
+                  data-ocid="attendance_import.secondary_button"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> Download Error
+                  Report
+                </Button>
+              )}
               {hasErrors && !skipErrors && (
                 <Button
                   size="sm"
@@ -1005,6 +1376,7 @@ export function AttendanceImport() {
                     "Advance",
                     "Remarks",
                     "Result",
+                    "Reason",
                     "Action",
                   ].map((h) => (
                     <th
@@ -1029,7 +1401,7 @@ export function AttendanceImport() {
                         formatDate(row.normalizedDate)
                       ) : (
                         <span className="text-red-500">
-                          {row.rawDate || "—"}
+                          {String(row.rawDate ?? "") || "—"}
                         </span>
                       )}
                     </td>
@@ -1045,7 +1417,7 @@ export function AttendanceImport() {
                     <td className="px-3 py-2">
                       {row.normalizedStatus ?? (
                         <span className="text-red-500">
-                          {row.rawDate || "—"}
+                          {row.rawStatus || "—"}
                         </span>
                       )}
                     </td>
@@ -1061,8 +1433,10 @@ export function AttendanceImport() {
                     </td>
                     <td className="px-3 py-2">
                       {statusBadge(row.validationStatus, row.validationNotes)}
-                      {row.validationNotes.length > 0 && (
-                        <div className="mt-0.5 space-y-0.5">
+                    </td>
+                    <td className="px-3 py-2 max-w-[180px]">
+                      {row.validationNotes.length > 0 ? (
+                        <div className="space-y-0.5">
                           {row.validationNotes.map((n) => (
                             <p
                               key={n}
@@ -1072,6 +1446,8 @@ export function AttendanceImport() {
                             </p>
                           ))}
                         </div>
+                      ) : (
+                        <span className="text-gray-300">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
@@ -1114,6 +1490,7 @@ export function AttendanceImport() {
                   {[
                     "Import ID",
                     "File Name",
+                    "File Type",
                     "Uploaded By",
                     "Date/Time",
                     "Mode",
@@ -1147,6 +1524,9 @@ export function AttendanceImport() {
                       title={rec.fileName}
                     >
                       {rec.fileName}
+                    </td>
+                    <td className="px-3 py-2">
+                      {fileTypeBadge(rec.fileType ?? "csv")}
                     </td>
                     <td className="px-3 py-2">{rec.uploadedBy}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
