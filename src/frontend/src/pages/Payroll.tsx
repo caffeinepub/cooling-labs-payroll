@@ -417,11 +417,17 @@ export function Payroll() {
   const handlePtSave = useCallback(() => {
     if (!ptTarget) return;
     setPtSaving(true);
+    const parsedPT = Number.parseFloat(ptAmount);
+    if (Number.isNaN(parsedPT) || parsedPT < 0) {
+      addToast("PT cannot be negative", "error");
+      setPtSaving(false);
+      return;
+    }
     const ok = payrollStorage.setPayrollPT(
       ptTarget.record.employeeId,
       BigInt(month),
       BigInt(year),
-      Number.parseFloat(ptAmount) || 0,
+      parsedPT,
     );
     if (ok) {
       addToast("PT updated", "success");
@@ -435,12 +441,17 @@ export function Payroll() {
 
   const handleAdvSave = useCallback(() => {
     if (!advTarget) return;
+    const parsed = Number.parseFloat(advAmount);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      addToast("Advance cannot be negative", "error");
+      return;
+    }
     setAdvSaving(true);
     const ok = payrollStorage.setAdvanceDeduction(
       advTarget.record.employeeId,
       BigInt(month),
       BigInt(year),
-      Number.parseFloat(advAmount) || 0,
+      parsed,
     );
     if (ok) {
       addToast("Advance deduction updated — Net Pay recalculated", "success");
@@ -455,11 +466,17 @@ export function Payroll() {
   const handleOtherDedSave = useCallback(() => {
     if (!otherDedTarget) return;
     setOtherDedSaving(true);
+    const parsedOther = Number.parseFloat(otherDedAmount);
+    if (Number.isNaN(parsedOther) || parsedOther < 0) {
+      addToast("Other deduction cannot be negative", "error");
+      setOtherDedSaving(false);
+      return;
+    }
     const ok = payrollStorage.setOtherDeduction(
       otherDedTarget.record.employeeId,
       BigInt(month),
       BigInt(year),
-      Number.parseFloat(otherDedAmount) || 0,
+      parsedOther,
     );
     if (ok) {
       addToast("Other deduction updated — Net Pay recalculated", "success");
@@ -1036,6 +1053,10 @@ export function Payroll() {
               <strong>{fmt(advTarget?.record.grossPay ?? 0)}</strong>
               &nbsp;|&nbsp; This amount will be deducted from Final Gross to
               compute Net Pay.
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
+              Current Advance:{" "}
+              <strong>{fmt(advTarget?.record.advanceDeduction ?? 0)}</strong>
             </div>
             <div>
               <Label htmlFor="adv-amount">Advance Amount (₹)</Label>

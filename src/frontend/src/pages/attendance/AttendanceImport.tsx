@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+// xlsx loaded via CDN script in index.html
+declare const XLSX: typeof import("xlsx");
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import { useAppContext } from "../../context/AppContext";
 import {

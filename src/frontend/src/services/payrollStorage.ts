@@ -63,6 +63,31 @@ function saveRaw(data: RawBreakdown[]): void {
   localStorage.setItem(KEY, JSON.stringify(data));
 }
 
+const MANUAL_DED_KEY = "clf_payroll_manual_ded";
+
+function loadManualDed(): Record<
+  string,
+  { pt?: number; advance?: number; otherDed?: number }
+> {
+  try {
+    const raw = localStorage.getItem(MANUAL_DED_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveManualDed(
+  data: Record<string, { pt?: number; advance?: number; otherDed?: number }>,
+): void {
+  localStorage.setItem(MANUAL_DED_KEY, JSON.stringify(data));
+}
+
+function manualDedKey(empId: string, month: number, year: number): string {
+  return `${empId}_${month}_${year}`;
+}
+
 function toBreakdown(r: RawBreakdown): PayrollBreakdownExtended {
   return {
     ...r,
@@ -241,6 +266,20 @@ export function generatePayroll(
     yearNum,
     _generatedBy,
   ).filter((b) => !alreadyPresent.has(b.record.employeeId));
+  // Apply manual deduction overrides for new records
+  const manualDataGen = loadManualDed();
+  for (const bd of newBreakdowns) {
+    const key = manualDedKey(bd.record.employeeId, monthNum, yearNum);
+    const manual = manualDataGen[key];
+    if (manual) {
+      if (manual.pt !== undefined) bd.record.ptDeduction = manual.pt;
+      if (manual.advance !== undefined)
+        bd.record.advanceDeduction = manual.advance;
+      if (manual.otherDed !== undefined)
+        bd.record.otherDeduction = manual.otherDed;
+      bd.record.netPay = recomputeNet(bd.record);
+    }
+  }
   saveRaw([...existing, ...newBreakdowns]);
   return { generatedCount: BigInt(newBreakdowns.length) };
 }
@@ -260,6 +299,20 @@ export function overwritePayroll(
     yearNum,
     _generatedBy,
   );
+  // Re-apply any manual deduction overrides so they survive regeneration
+  const manualData = loadManualDed();
+  for (const bd of newBreakdowns) {
+    const key = manualDedKey(bd.record.employeeId, monthNum, yearNum);
+    const manual = manualData[key];
+    if (manual) {
+      if (manual.pt !== undefined) bd.record.ptDeduction = manual.pt;
+      if (manual.advance !== undefined)
+        bd.record.advanceDeduction = manual.advance;
+      if (manual.otherDed !== undefined)
+        bd.record.otherDeduction = manual.otherDed;
+      bd.record.netPay = recomputeNet(bd.record);
+    }
+  }
   saveRaw([...existing, ...newBreakdowns]);
   return { generatedCount: BigInt(newBreakdowns.length) };
 }
@@ -375,6 +428,10 @@ export function setPayrollPT(
   rec.ptDeduction = ptAmount;
   rec.netPay = recomputeNet(rec);
   saveRaw(data);
+  const manualPT = loadManualDed();
+  const ptKey = manualDedKey(empId, monthNum, yearNum);
+  manualPT[ptKey] = { ...(manualPT[ptKey] ?? {}), pt: ptAmount };
+  saveManualDed(manualPT);
   return true;
 }
 
@@ -398,6 +455,10 @@ export function setAdvanceDeduction(
   rec.advanceDeduction = amount;
   rec.netPay = recomputeNet(rec);
   saveRaw(data);
+  const manualAdv = loadManualDed();
+  const advKey = manualDedKey(empId, monthNum, yearNum);
+  manualAdv[advKey] = { ...(manualAdv[advKey] ?? {}), advance: amount };
+  saveManualDed(manualAdv);
   return true;
 }
 
@@ -421,5 +482,12 @@ export function setOtherDeduction(
   rec.otherDeduction = amount;
   rec.netPay = recomputeNet(rec);
   saveRaw(data);
+  const manualOther = loadManualDed();
+  const otherKey = manualDedKey(empId, monthNum, yearNum);
+  manualOther[otherKey] = {
+    ...(manualOther[otherKey] ?? {}),
+    otherDed: amount,
+  };
+  saveManualDed(manualOther);
   return true;
 }
