@@ -22,6 +22,10 @@ import {
 } from "../components/ui/select";
 import { useAppContext } from "../context/AppContext";
 import { useToast } from "../hooks/useToast";
+import {
+  createEmployeeInCanister,
+  updateEmployeeInCanister,
+} from "../services/canisterEmployeeService";
 import * as workforceStorage from "../services/workforceStorage";
 import type { Employee } from "../types";
 
@@ -221,17 +225,22 @@ export function Employees() {
     try {
       let ok: boolean;
       if (editing.id) {
-        ok = workforceStorage.updateEmployee(editing.id, empToSave);
+        const updateResult = await updateEmployeeInCanister(
+          editing.id,
+          empToSave,
+        );
+        ok = updateResult.success;
         if (!ok) {
           addToast("Update failed — employee not found", "error");
           return;
         }
       } else {
-        ok = workforceStorage.createEmployee({
+        const createResult = await createEmployeeInCanister({
           ...empToSave,
           id: "",
           createdAt: BigInt(Date.now()),
         });
+        ok = createResult.success;
         if (!ok) {
           addToast(
             `Employee ID "${editing.employeeId}" already exists. Use a unique ID.`,
@@ -264,7 +273,7 @@ export function Employees() {
     try {
       const newStatus =
         confirmTarget.status === "active" ? "inactive" : "active";
-      const ok = workforceStorage.updateEmployee(confirmTarget.id, {
+      const { success: ok } = await updateEmployeeInCanister(confirmTarget.id, {
         ...confirmTarget,
         status: newStatus,
       });

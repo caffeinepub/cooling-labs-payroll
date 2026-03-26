@@ -23,6 +23,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useAppContext } from "../context/AppContext";
 import { useToast } from "../hooks/useToast";
+import * as canisterPayroll from "../services/canisterPayrollService";
 import * as payrollStorage from "../services/payrollStorage";
 import type { PayrollBreakdownExtended } from "../services/payrollStorage";
 import type { Employee, PayrollSummary } from "../types";
@@ -324,18 +325,23 @@ export function Payroll() {
   }, [overrideForm]);
 
   const generate = useCallback(
-    (overwrite = false) => {
+    async (overwrite = false) => {
       setGenerating(true);
-      const res = overwrite
-        ? payrollStorage.overwritePayroll(BigInt(month), BigInt(year), "admin")
-        : payrollStorage.generatePayroll(BigInt(month), BigInt(year), "admin");
-      addToast(
-        `Generated for ${String(res.generatedCount)} employees`,
-        "success",
-      );
-      loadPayroll();
-      setGenerating(false);
-      setOverwriteOpen(false);
+      try {
+        const res = overwrite
+          ? await canisterPayroll.overwriteAndSavePayroll(month, year)
+          : await canisterPayroll.generateAndSavePayroll(month, year);
+        addToast(
+          `Generated for ${String(res.generatedCount)} employees`,
+          "success",
+        );
+        loadPayroll();
+        setOverwriteOpen(false);
+      } catch {
+        addToast("Generation failed", "error");
+      } finally {
+        setGenerating(false);
+      }
     },
     [month, year, addToast, loadPayroll],
   );
@@ -372,13 +378,13 @@ export function Payroll() {
     });
   };
 
-  const handleOverrideSave = useCallback(() => {
+  const handleOverrideSave = useCallback(async () => {
     if (!overrideTarget || !overrideForm) return;
     const r = overrideTarget.record;
     const p = (k: keyof OverrideForm) =>
       Number.parseFloat(overrideForm[k]) || 0;
     setOverrideSaving(true);
-    const ok = payrollStorage.manualOverridePayroll(
+    const ok = await canisterPayroll.manualOverrideAndSync(
       r.employeeId,
       BigInt(month),
       BigInt(year),
@@ -393,7 +399,7 @@ export function Payroll() {
       p("pfDeduction"),
       p("esiDeduction"),
       p("ptDeduction"),
-      computedNetPay, // ignored by storage (recomputed there)
+      computedNetPay,
       "admin",
     );
     if (ok) {
@@ -414,7 +420,7 @@ export function Payroll() {
     loadPayroll,
   ]);
 
-  const handlePtSave = useCallback(() => {
+  const handlePtSave = useCallback(async () => {
     if (!ptTarget) return;
     setPtSaving(true);
     const parsedPT = Number.parseFloat(ptAmount);
@@ -423,7 +429,7 @@ export function Payroll() {
       setPtSaving(false);
       return;
     }
-    const ok = payrollStorage.setPayrollPT(
+    const ok = await canisterPayroll.setPTAndSync(
       ptTarget.record.employeeId,
       BigInt(month),
       BigInt(year),
@@ -439,7 +445,7 @@ export function Payroll() {
     setPtSaving(false);
   }, [ptTarget, ptAmount, month, year, addToast, loadPayroll]);
 
-  const handleAdvSave = useCallback(() => {
+  const handleAdvSave = useCallback(async () => {
     if (!advTarget) return;
     const parsed = Number.parseFloat(advAmount);
     if (Number.isNaN(parsed) || parsed < 0) {
@@ -447,7 +453,7 @@ export function Payroll() {
       return;
     }
     setAdvSaving(true);
-    const ok = payrollStorage.setAdvanceDeduction(
+    const ok = await canisterPayroll.setAdvanceAndSync(
       advTarget.record.employeeId,
       BigInt(month),
       BigInt(year),
@@ -463,7 +469,7 @@ export function Payroll() {
     setAdvSaving(false);
   }, [advTarget, advAmount, month, year, addToast, loadPayroll]);
 
-  const handleOtherDedSave = useCallback(() => {
+  const handleOtherDedSave = useCallback(async () => {
     if (!otherDedTarget) return;
     setOtherDedSaving(true);
     const parsedOther = Number.parseFloat(otherDedAmount);
@@ -472,7 +478,7 @@ export function Payroll() {
       setOtherDedSaving(false);
       return;
     }
-    const ok = payrollStorage.setOtherDeduction(
+    const ok = await canisterPayroll.setOtherDedAndSync(
       otherDedTarget.record.employeeId,
       BigInt(month),
       BigInt(year),

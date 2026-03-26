@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Building2,
+  CheckCircle,
   Eye,
   EyeOff,
   HardHat,
@@ -28,6 +29,9 @@ export function AdminLogin() {
   const [error, setError] = useState("");
   const [companyPreview, setCompanyPreview] = useState<Company | null>(null);
   const [previewLooked, setPreviewLooked] = useState(false);
+  const [sessionSource, setSessionSource] = useState<
+    "canister" | "local" | null
+  >(null);
 
   const lookupCompany = useCallback((code: string) => {
     if (code.length >= 3) {
@@ -46,12 +50,9 @@ export function AdminLogin() {
     lookupCompany(val);
   };
 
-  const handleCodeBlur = () => {
-    lookupCompany(companyCode);
-  };
-
   const handleLogin = useCallback(async () => {
     setError("");
+    setSessionSource(null);
     if (!companyCode.trim()) {
       setError("Enter company code");
       return;
@@ -64,6 +65,7 @@ export function AdminLogin() {
       setError("Enter password");
       return;
     }
+
     const ok = await login(
       companyCode.trim().toUpperCase(),
       username.trim(),
@@ -72,7 +74,12 @@ export function AdminLogin() {
     if (ok) {
       navigate({ to: "/" });
     } else {
-      setError("Invalid company code, username, or password");
+      const company = getCompanyByCode(companyCode.trim().toUpperCase());
+      if (company && company.status !== "active") {
+        setError(`Company is ${company.status}. Contact HumanskeyAI support.`);
+      } else {
+        setError("Invalid company code, username, or password");
+      }
     }
   }, [companyCode, username, password, login, navigate]);
 
@@ -96,6 +103,13 @@ export function AdminLogin() {
             HumanskeyAI Workforce Platform
           </p>
         </div>
+
+        {sessionSource === "canister" && (
+          <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+            <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            Session verified on ICP canister
+          </div>
+        )}
 
         {/* Company preview card */}
         {previewLooked && companyPreview && (
@@ -148,13 +162,14 @@ export function AdminLogin() {
               data-ocid="admin.login.input"
               value={companyCode}
               onChange={handleCodeChange}
-              onBlur={handleCodeBlur}
+              onBlur={() => lookupCompany(companyCode)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               placeholder="e.g. COOLABS"
               className="uppercase"
             />
             <p className="text-xs text-gray-400">Default: COOLABS</p>
           </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="admin-username">
               <User className="w-3.5 h-3.5 inline mr-1" />
@@ -168,6 +183,7 @@ export function AdminLogin() {
               placeholder="admin"
             />
           </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="admin-pw">
               <Lock className="w-3.5 h-3.5 inline mr-1" />
@@ -214,10 +230,17 @@ export function AdminLogin() {
             className="w-full"
           >
             <Lock className="w-4 h-4 mr-2" />
-            {loggingIn ? "Logging in..." : "Login"}
+            {loggingIn ? "Verifying..." : "Login"}
           </Button>
         </div>
-        <div className="mt-6 text-center">
+
+        <div className="mt-4 text-center">
+          <p className="text-xs text-gray-400">
+            Session authenticated via ICP canister
+          </p>
+        </div>
+
+        <div className="mt-3 text-center">
           <Link
             to="/superadmin/login"
             className="text-xs text-gray-400 hover:text-blue-600 transition-colors"

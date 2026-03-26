@@ -1,8 +1,24 @@
 /**
  * attendanceStorage.ts
- * localStorage-backed attendance CRUD — tenant-aware.
+ * Tenant-aware attendance storage.
+ *
+ * Source of truth: ICP canister (via canisterAttendanceService)
+ * Local cache: localStorage (seeded from canister on login, used for fast sync reads)
+ *
+ * All write functions dual-write:
+ *   1. localStorage (sync, instant UI update)
+ *   2. canister (async, fire-and-forget — persists across devices)
  */
 import type { AttendanceRecord } from "../types";
+import {
+  bulkMarkAttendanceInCanister,
+  bulkMarkAttendanceOverwriteInCanister,
+  deleteAttendanceInCanister,
+  markAttendanceInCanister,
+  markAttendanceOverwriteInCanister,
+  updateAttendanceAdvanceInCanister,
+  updateAttendanceOTInCanister,
+} from "./canisterAttendanceService";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getKey(): string {
@@ -49,6 +65,20 @@ function genId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Export all raw records for a company (used by canisterAttendanceService for migration).
+ */
+export function getAllAttendanceRaw(companyCode: string): RawRecord[] {
+  const key = getTenantKey(companyCode, "clf_attendance");
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
 export function markAttendance(
   empId: string,
   dateStr: string,
@@ -88,6 +118,19 @@ export function markAttendance(
     createdAt: now,
   });
   save(records);
+  // Fire-and-forget canister write
+  void markAttendanceInCanister(
+    empId,
+    dateStr,
+    status,
+    otHours,
+    punchIn,
+    punchOut,
+    lat,
+    lng,
+    source,
+    advanceAmount,
+  );
   return true;
 }
 
@@ -134,6 +177,19 @@ export function markAttendanceOverwrite(
     records.push(entry);
   }
   save(records);
+  // Fire-and-forget canister write
+  void markAttendanceOverwriteInCanister(
+    empId,
+    dateStr,
+    status,
+    otHours,
+    punchIn,
+    punchOut,
+    lat,
+    lng,
+    source,
+    advanceAmount,
+  );
 }
 
 export function updateAttendanceAdvance(
@@ -152,6 +208,12 @@ export function updateAttendanceAdvance(
     records[idx].changedBy = source;
     records[idx].updatedAt = Date.now();
     save(records);
+    void updateAttendanceAdvanceInCanister(
+      empId,
+      dateStr,
+      records[idx].advanceAmount ?? advanceAmount,
+      source,
+    );
     return true;
   }
   const now = Date.now();
@@ -176,6 +238,18 @@ export function updateAttendanceAdvance(
     createdAt: now,
   });
   save(records);
+  void markAttendanceInCanister(
+    empId,
+    dateStr,
+    "Present",
+    0,
+    "",
+    "",
+    0,
+    0,
+    source,
+    advanceAmount,
+  );
   return true;
 }
 
@@ -198,6 +272,7 @@ export function bulkMarkAttendance(
   let skippedCount = 0;
   const errors: string[] = [];
   const now = Date.now();
+  const newEntries: [string, string, string, number][] = [];
   for (const [empId, dateStr, status, otHours] of entries) {
     const exists = records.some(
       (r) => r.employeeId === empId && r.date === dateStr,
@@ -226,9 +301,13 @@ export function bulkMarkAttendance(
       updatedAt: now,
       createdAt: now,
     });
+    newEntries.push([empId, dateStr, status, otHours]);
     successCount++;
   }
   save(records);
+  if (newEntries.length > 0) {
+    void bulkMarkAttendanceInCanister(newEntries, source);
+  }
   return {
     successCount: BigInt(successCount),
     skippedCount: BigInt(skippedCount),
@@ -280,6 +359,8 @@ export function bulkMarkAttendanceOverwrite(
     successCount++;
   }
   save(records);
+  // Fire-and-forget canister bulk overwrite
+  void bulkMarkAttendanceOverwriteInCanister(entries, source);
   return {
     successCount: BigInt(successCount),
     skippedCount: BigInt(0),
@@ -334,6 +415,7 @@ export function updateAttendanceOT(
   records[idx].changedBy = source;
   records[idx].updatedAt = Date.now();
   save(records);
+  void updateAttendanceOTInCanister(empId, dateStr, otHours, source);
   return true;
 }
 
@@ -376,5 +458,6 @@ export function deleteAttendance(employeeId: string, date: string): boolean {
   );
   if (filtered.length === before) return false;
   save(filtered);
+  void deleteAttendanceInCanister(employeeId, date);
   return true;
 }

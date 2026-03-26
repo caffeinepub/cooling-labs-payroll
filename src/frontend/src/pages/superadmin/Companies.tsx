@@ -4,6 +4,7 @@ import {
   Building2,
   Check,
   Edit2,
+  KeyRound,
   LogOut,
   Plus,
   Search,
@@ -211,6 +212,15 @@ export function Companies() {
             <Link to="/superadmin/companies">
               <Button variant="ghost" size="sm" className="text-blue-400">
                 <Building2 className="w-4 h-4 mr-1" /> Companies
+              </Button>
+            </Link>
+            <Link to="/superadmin/change-password">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-300 hover:text-white"
+              >
+                <KeyRound className="w-4 h-4 mr-1" /> Change Password
               </Button>
             </Link>
             <Button

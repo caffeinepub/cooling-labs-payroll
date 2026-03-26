@@ -8,10 +8,15 @@ import React, {
 } from "react";
 import {
   clearCompanySession,
+  getCompanySessionCached,
+  loginCompanyCanister,
+  logoutCompany,
+  validateCompanySession,
+} from "../services/canisterAuthService";
+import {
   getCompanyByCode,
-  getCompanySession,
-  loginCompany,
-  setCompanySession,
+  getCompanySession as localGetCompanySession,
+  setCompanySession as localSetCompanySession,
   updateCompany,
 } from "../services/tenantStorage";
 
@@ -39,6 +44,7 @@ interface AdminAuthContextType {
   changePassword: (oldPw: string, newPw: string) => Promise<boolean>;
   updateAdminProfile: (name: string) => void;
   adminName: string;
+  activeCompanyCode: string;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType>({
@@ -51,17 +57,21 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   changePassword: async () => false,
   updateAdminProfile: () => {},
   adminName: "Administrator",
+  activeCompanyCode: "COOLABS",
 });
 
 const SESSION_KEY = "clf_session";
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [adminLoggedIn, setAdminLoggedIn] = useState(() => {
-    // Check both legacy key and new tenant session
-    const companySession = getCompanySession();
-    if (companySession && companySession.role === "company_admin") return true;
+    // Check canister session cache or legacy
+    const cached = getCompanySessionCached();
+    if (cached) return true;
+    const local = localGetCompanySession();
+    if (local && local.role === "company_admin") return true;
     return localStorage.getItem("adminLoggedIn") === "true";
   });
+
   const [session, setSession] = useState<SessionUser | null>(() => {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
@@ -70,19 +80,47 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
+
   const [loggingIn, setLoggingIn] = useState(false);
+
   const [adminName, setAdminName] = useState(() => {
-    const companySession = getCompanySession();
-    if (companySession) return companySession.username || "Administrator";
+    const cached = getCompanySessionCached();
+    if (cached) return cached.username || "Administrator";
+    const local = localGetCompanySession();
+    if (local) return local.username || "Administrator";
     return localStorage.getItem("adminName") || "Administrator";
   });
 
-  // Sync adminLoggedIn from session on mount
+  const [activeCompanyCode, setActiveCompanyCode] = useState(() => {
+    const cached = getCompanySessionCached();
+    if (cached) return cached.companyCode;
+    const local = localGetCompanySession();
+    if (local) return local.companyCode;
+    return "COOLABS";
+  });
+
+  // On mount: validate existing canister session (async)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run only on mount
   useEffect(() => {
-    if (session?.role === "admin") {
-      setAdminLoggedIn(true);
-    }
-  }, [session]);
+    if (!adminLoggedIn) return;
+    validateCompanySession()
+      .then((s) => {
+        if (s) {
+          setActiveCompanyCode(s.companyCode);
+          setAdminName(s.username);
+        } else {
+          // Session expired on canister
+          const local = localGetCompanySession();
+          if (!local) {
+            setAdminLoggedIn(false);
+            setSession(null);
+          }
+        }
+      })
+      .catch(() => {
+        // Canister unreachable; keep cached state
+      });
+  }, []);
 
   const login = useCallback(
     async (
@@ -92,14 +130,23 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     ): Promise<boolean> => {
       setLoggingIn(true);
       try {
-        const companySession = loginCompany(companyCode, username, password);
-        if (!companySession) return false;
+        const result = await loginCompanyCanister(
+          companyCode.trim().toUpperCase(),
+          username.trim(),
+          password,
+        );
+        if (!result.success || !result.session) return false;
+
         const user: SessionUser = { role: "admin", name: username };
         localStorage.setItem("adminLoggedIn", "true");
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
         setAdminLoggedIn(true);
         setSession(user);
         setAdminName(username);
+        setActiveCompanyCode(result.session.companyCode);
+        console.log(
+          `[Auth] Logged in via ${result.source}: ${result.session.companyCode}`,
+        );
         return true;
       } finally {
         setLoggingIn(false);
@@ -111,10 +158,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const loginSupervisor = useCallback((user: SessionUser) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     setSession(user);
-    // Also store in company session for tenant-awareness
-    const existing = getCompanySession();
+    // Keep company session in sync for tenant-awareness
+    const existing = localGetCompanySession();
     if (existing) {
-      setCompanySession({
+      localSetCompanySession({
         ...existing,
         role: "supervisor",
         username: user.username || user.name,
@@ -123,19 +170,20 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await logoutCompany();
     localStorage.removeItem("adminLoggedIn");
     localStorage.removeItem(SESSION_KEY);
-    clearCompanySession();
     setAdminLoggedIn(false);
     setSession(null);
+    setActiveCompanyCode("COOLABS");
   }, []);
 
   const changePassword = useCallback(
     async (oldPw: string, newPw: string): Promise<boolean> => {
-      const companySession = getCompanySession();
-      if (!companySession) return false;
-      const company = getCompanyByCode(companySession.companyCode);
+      const cached = getCompanySessionCached();
+      if (!cached) return false;
+      const company = getCompanyByCode(cached.companyCode);
       if (!company) return false;
       if (company.adminPassword !== oldPw) return false;
       updateCompany(company.id, { adminPassword: newPw });
@@ -170,6 +218,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         changePassword,
         updateAdminProfile,
         adminName,
+        activeCompanyCode,
       }}
     >
       {children}

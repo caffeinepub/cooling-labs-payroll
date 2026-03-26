@@ -16,7 +16,6 @@ persistent actor {
   type SupervisorV1 = { phone : Text; name : Text; siteId : Text; active : Bool };
 
   // ── V2 Types (previous stable schema — used only for migration) ─────────────────
-  // PayrollRecord WITHOUT ptDeduction — matches the existing stable var on-chain.
 
   type PayrollRecordV2 = {
     id : Text; employeeId : Text; month : Nat; year : Nat;
@@ -27,7 +26,6 @@ persistent actor {
     generatedAt : Int;
   };
 
-  // V1 payroll (even older, no hra/conveyance etc.)
   type PayrollRecordV1 = { id : Text; employeeId : Text; month : Nat; year : Nat; basicSalary : Float; otAmount : Float; grossPay : Float; pfDeduction : Float; esiDeduction : Float; netPay : Float; generatedAt : Int };
 
   // ── Current Types ─────────────────────────────────────────────────────
@@ -38,9 +36,61 @@ persistent actor {
 
   type Employee = { id : Text; employeeId : Text; name : Text; mobile : Text; site : Text; tradeId : Text; departmentId : Text; status : Text; salaryMode : Text; cityType : Text; basicSalary : Float; hra : Float; conveyance : Float; specialAllowance : Float; otherAllowance : Float; otRate : Float; pfApplicable : Bool; esiApplicable : Bool; createdAt : Int };
 
+  type TenantEmployee = { id : Text; companyCode : Text; employeeId : Text; name : Text; mobile : Text; site : Text; tradeId : Text; departmentId : Text; status : Text; salaryMode : Text; cityType : Text; basicSalary : Float; hra : Float; conveyance : Float; specialAllowance : Float; otherAllowance : Float; otRate : Float; pfApplicable : Bool; esiApplicable : Bool; aadhaarNumber : Text; panNumber : Text; uanNumber : Text; esiNumber : Text; bankAccountHolderName : Text; bankAccountNumber : Text; ifscCode : Text; bankName : Text; branchAddress : Text; dateOfJoining : Text; createdAt : Int };
+
   type AttendanceRecord = { id : Text; employeeId : Text; date : Text; status : Text; otHours : Float; punchIn : Text; punchOut : Text; lat : Float; lng : Float; isFlagged : Bool; flagReason : Text; isRegularized : Bool; regularizationReason : Text; changedBy : Text; updatedAt : Int; createdAt : Int };
 
-  // PayrollRecord WITH ptDeduction — current schema (V3)
+  // Tenant-aware attendance with advanceAmount
+  type TenantAttendanceRecord = {
+    id : Text;
+    companyCode : Text;
+    employeeId : Text;
+    date : Text;
+    status : Text;
+    otHours : Float;
+    advanceAmount : Float;
+    punchIn : Text;
+    punchOut : Text;
+    lat : Float;
+    lng : Float;
+    isFlagged : Bool;
+    flagReason : Text;
+    isRegularized : Bool;
+    regularizationReason : Text;
+    changedBy : Text;
+    updatedAt : Int;
+    createdAt : Int;
+  };
+
+  type TenantPayrollRecord = {
+    id : Text;
+    companyCode : Text;
+    employeeId : Text;
+    month : Nat;
+    year : Nat;
+    earnedBasic : Float;
+    earnedHra : Float;
+    earnedConveyance : Float;
+    earnedSpecialAllowance : Float;
+    earnedOtherAllowance : Float;
+    earnedGross : Float;
+    otPay : Float;
+    finalGross : Float;
+    pfDeduction : Float;
+    esiDeduction : Float;
+    ptDeduction : Float;
+    advanceDeduction : Float;
+    otherDeduction : Float;
+    netPay : Float;
+    paidDays : Float;
+    presentDays : Float;
+    halfDays : Float;
+    lopDays : Float;
+    totalDaysInMonth : Nat;
+    otHours : Float;
+    generatedAt : Int;
+  };
+
   type PayrollRecord = {
     id : Text; employeeId : Text; month : Nat; year : Nat;
     basicSalary : Float; hra : Float; conveyance : Float;
@@ -62,7 +112,61 @@ persistent actor {
 
   type RegularizationRequest = { id : Text; employeeId : Text; date : Text; oldStatus : Text; requestedStatus : Text; reason : Text; requestedBy : Text; approvalStatus : Text; approvedBy : Text; approvedAt : Int; createdAt : Int };
 
-  // ── Stable vars — V1 (original schema names, loaded from old canister state) ────────
+  // ── Company / Auth Types ──────────────────────────────────────────────
+
+  type Company = {
+    id : Text;
+    companyCode : Text;
+    companyName : Text;
+    legalName : Text;
+    brandName : Text;
+    address : Text;
+    state : Text;
+    country : Text;
+    status : Text;
+    adminUsername : Text;
+    adminPasswordHash : Text;
+    planStatus : Text;
+    moduleAccess : [Text];
+    logoDataUrl : Text;
+    createdAt : Int;
+  };
+
+  type CompanySession = {
+    token : Text;
+    companyId : Text;
+    companyCode : Text;
+    companyName : Text;
+    username : Text;
+    role : Text;
+    siteId : Text;
+    createdAt : Int;
+    expiresAt : Int;
+  };
+
+  type SuperAdminSession = {
+    token : Text;
+    username : Text;
+    createdAt : Int;
+    expiresAt : Int;
+  };
+
+  type LoginResult = {
+    success : Bool;
+    token : Text;
+    companyCode : Text;
+    companyName : Text;
+    role : Text;
+    errorMsg : Text;
+  };
+
+  type SuperAdminLoginResult = {
+    success : Bool;
+    token : Text;
+    errorMsg : Text;
+  };
+
+  // ── Stable vars — V1 ────────────────────────────────────────────────────
 
   stable var sites : [SiteV1] = [];
   stable var employees : [EmployeeV1] = [];
@@ -70,17 +174,14 @@ persistent actor {
   stable var payroll : [PayrollRecordV1] = [];
   stable var supervisors : [SupervisorV1] = [];
 
-  // ── Stable vars — V2 (previous deployed schema, now renamed for migration) ───────
-  // payrollV2 used the OLD PayrollRecord type (without ptDeduction).
-  // We declare it here with the OLD type so Motoko can read the existing
-  // stable memory, then migrate it to payrollV3 in postupgrade.
+  // ── Stable vars — V2 ───────────────────────────────────────────────────
 
   stable var trades : [Trade] = [];
   stable var departments : [Department] = [];
   stable var sitesV2 : [Site] = [];
   stable var employeesV2 : [Employee] = [];
   stable var attendanceV2 : [AttendanceRecord] = [];
-  stable var payrollV2 : [PayrollRecordV2] = [];   // OLD type — kept for migration only
+  stable var payrollV2 : [PayrollRecordV2] = [];
   stable var auditLogs : [AuditLog] = [];
   stable var advances : [Advance] = [];
   stable var supervisorsV2 : [Supervisor] = [];
@@ -89,15 +190,29 @@ persistent actor {
   stable var counter : Nat = 0;
   stable var migrated : Bool = false;
 
-  // ── V3 stable var — current schema with ptDeduction ────────────────────────
+  // ── V3 stable var ────────────────────────────────────────────────────
 
   stable var payrollV3 : [PayrollRecord] = [];
   stable var migratedPayrollV3 : Bool = false;
 
+  // ── Company / Auth stable vars ────────────────────────────────────────
+
+  stable var companies : [Company] = [];
+  stable var companySessions : [CompanySession] = [];
+  stable var superAdminSessions : [SuperAdminSession] = [];
+  stable var superAdminPassword : Text = "Humanskey@123";
+  stable var companiesBootstrapped : Bool = false;
+  stable var tenantEmployees : [TenantEmployee] = [];
+
+  // ── Tenant Attendance stable var ──────────────────────────────────────
+
+  stable var tenantAttendance : [TenantAttendanceRecord] = [];
+
+  stable var tenantPayroll : [TenantPayrollRecord] = [];
+
   // ── Migration ───────────────────────────────────────────────────────────
 
   system func postupgrade() {
-    // V1 → V2 migration (original empty-schema canister)
     if (not migrated) {
       if (sites.size() > 0) {
         sitesV2 := Array.map(sites, func(s : SiteV1) : Site { { id = s.id; name = s.name; status = s.status; lat = 0.0; lng = 0.0; radiusMeters = 0.0; createdAt = s.createdAt } });
@@ -112,7 +227,6 @@ persistent actor {
         attendance := [];
       };
       if (payroll.size() > 0) {
-        // Migrate old V1 payroll records into payrollV2 (no-ptDeduction schema)
         payrollV2 := Array.map(payroll, func(p : PayrollRecordV1) : PayrollRecordV2 { { id = p.id; employeeId = p.employeeId; month = p.month; year = p.year; basicSalary = p.basicSalary; hra = 0.0; conveyance = 0.0; specialAllowance = 0.0; otherAllowance = 0.0; otAmount = p.otAmount; grossPay = p.grossPay; pfDeduction = p.pfDeduction; esiDeduction = p.esiDeduction; netPay = p.netPay; generatedAt = p.generatedAt } });
         payroll := [];
       };
@@ -122,7 +236,6 @@ persistent actor {
       };
       migrated := true;
     };
-    // V2 → V3 payroll migration: add ptDeduction = 0.0 to all existing records
     if (not migratedPayrollV3) {
       if (payrollV2.size() > 0) {
         payrollV3 := Array.map(payrollV2, func(p : PayrollRecordV2) : PayrollRecord {
@@ -133,9 +246,13 @@ persistent actor {
             pfDeduction = p.pfDeduction; esiDeduction = p.esiDeduction;
             ptDeduction = 0.0; netPay = p.netPay; generatedAt = p.generatedAt }
         });
-        payrollV2 := []; // clear old stable var to save memory
+        payrollV2 := [];
       };
       migratedPayrollV3 := true;
+    };
+    if (not companiesBootstrapped) {
+      bootstrapDefaultCompanies();
+      companiesBootstrapped := true;
     };
   };
 
@@ -154,7 +271,65 @@ persistent actor {
 
   func padMonth(m : Nat) : Text { if (m < 10) "0" # Nat.toText(m) else Nat.toText(m) };
 
-  // ── Admin ─────────────────────────────────────────────────────────────
+  let SESSION_TTL_NS : Int = 86_400_000_000_000;
+
+  func generateToken() : Text {
+    counter += 1;
+    "tok-" # Int.toText(Time.now()) # "-" # Nat.toText(counter);
+  };
+
+  func isSessionValid(expiresAt : Int) : Bool {
+    Time.now() < expiresAt;
+  };
+
+  // ── Company Bootstrap ─────────────────────────────────────────────────
+
+  func bootstrapDefaultCompanies() {
+    let hasCoolabs = Array.find(companies, func(c : Company) : Bool { c.companyCode == "COOLABS" }) != null;
+    let hasDemocorp = Array.find(companies, func(c : Company) : Bool { c.companyCode == "DEMOCORP" }) != null;
+
+    if (not hasCoolabs) {
+      companies := Array.append(companies, [{
+        id = "company-coolabs";
+        companyCode = "COOLABS";
+        companyName = "Cooling Labs";
+        legalName = "COOLING LABS ENGINEERS LLP.";
+        brandName = "Cooling Labs";
+        address = "";
+        state = "Maharashtra";
+        country = "India";
+        status = "active";
+        adminUsername = "admin";
+        adminPasswordHash = "admin123";
+        planStatus = "active";
+        moduleAccess = ["employees","attendance","bulkAttendance","whatsappAttendance","attendanceImport","regularization","payroll","reports","masters","userManagement","salarySlips"];
+        logoDataUrl = "";
+        createdAt = Time.now();
+      }]);
+    };
+
+    if (not hasDemocorp) {
+      companies := Array.append(companies, [{
+        id = "company-democorp";
+        companyCode = "DEMOCORP";
+        companyName = "Demo Corporation";
+        legalName = "Demo Corporation Pvt. Ltd.";
+        brandName = "DemoCorp";
+        address = "123 Demo Street, Mumbai";
+        state = "Maharashtra";
+        country = "India";
+        status = "active";
+        adminUsername = "admin";
+        adminPasswordHash = "demo123";
+        planStatus = "trial";
+        moduleAccess = ["employees","attendance","bulkAttendance","whatsappAttendance","attendanceImport","regularization","payroll","reports","masters","userManagement","salarySlips"];
+        logoDataUrl = "";
+        createdAt = Time.now();
+      }]);
+    };
+  };
+
+  // ── Admin (legacy) ────────────────────────────────────────────────────
 
   public func isCallerAdmin() : async Bool { true };
   public query func verifyAdminPassword(password : Text) : async Bool { password == adminPasswordHash };
@@ -162,6 +337,190 @@ persistent actor {
     if (oldPassword != adminPasswordHash) return false;
     adminPasswordHash := newPassword;
     true;
+  };
+
+  // ── Company Management ─────────────────────────────────────────────────
+
+  public query func getCompanies() : async [Company] { companies };
+
+  public query func getCompanyByCode(code : Text) : async ?Company {
+    Array.find(companies, func(c : Company) : Bool {
+      toLower(c.companyCode) == toLower(code)
+    });
+  };
+
+  public func createCompany(
+    companyCode : Text, companyName : Text, legalName : Text, brandName : Text,
+    address : Text, state : Text, country : Text,
+    adminUsername : Text, adminPassword : Text, planStatus : Text,
+    moduleAccess : [Text], logoDataUrl : Text
+  ) : async { success : Bool; errorMsg : Text } {
+    let upper = Text.map(companyCode, func(c : Char) : Char {
+      if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
+    });
+    if (Array.find(companies, func(c : Company) : Bool { c.companyCode == upper }) != null) {
+      return { success = false; errorMsg = "Company code already exists" };
+    };
+    companies := Array.append(companies, [{
+      id = "company-" # nextId();
+      companyCode = upper;
+      companyName = companyName;
+      legalName = legalName;
+      brandName = if (brandName == "") companyName else brandName;
+      address = address;
+      state = state;
+      country = if (country == "") "India" else country;
+      status = "active";
+      adminUsername = adminUsername;
+      adminPasswordHash = adminPassword;
+      planStatus = planStatus;
+      moduleAccess = if (moduleAccess.size() == 0) ["employees","attendance","payroll","reports","masters","userManagement"] else moduleAccess;
+      logoDataUrl = logoDataUrl;
+      createdAt = Time.now();
+    }]);
+    { success = true; errorMsg = "" };
+  };
+
+  public func updateCompany(
+    id : Text, companyName : Text, legalName : Text, brandName : Text,
+    address : Text, state : Text, country : Text,
+    adminUsername : Text, planStatus : Text, moduleAccess : [Text], logoDataUrl : Text
+  ) : async Bool {
+    var found = false;
+    companies := Array.map(companies, func(c : Company) : Company {
+      if (c.id == id) {
+        found := true;
+        { c with
+          companyName = companyName; legalName = legalName; brandName = brandName;
+          address = address; state = state; country = country;
+          adminUsername = adminUsername; planStatus = planStatus;
+          moduleAccess = moduleAccess; logoDataUrl = logoDataUrl;
+        }
+      } else c;
+    });
+    found;
+  };
+
+  public func updateCompanyStatus(id : Text, status : Text) : async Bool {
+    var found = false;
+    companies := Array.map(companies, func(c : Company) : Company {
+      if (c.id == id) { found := true; { c with status = status } } else c;
+    });
+    found;
+  };
+
+  public func updateCompanyAdminPassword(companyId : Text, newPassword : Text) : async Bool {
+    var found = false;
+    companies := Array.map(companies, func(c : Company) : Company {
+      if (c.id == companyId) { found := true; { c with adminPasswordHash = newPassword } } else c;
+    });
+    found;
+  };
+
+  // ── Company Authentication ─────────────────────────────────────────────
+
+  public func loginCompany(companyCode : Text, username : Text, password : Text) : async LoginResult {
+    let upper = Text.map(companyCode, func(c : Char) : Char {
+      if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
+    });
+    let found = Array.find(companies, func(c : Company) : Bool { c.companyCode == upper });
+    switch (found) {
+      case null { return { success = false; token = ""; companyCode = ""; companyName = ""; role = ""; errorMsg = "Company not found" } };
+      case (?company) {
+        if (company.status != "active") {
+          return { success = false; token = ""; companyCode = ""; companyName = ""; role = ""; errorMsg = "Company is " # company.status # ". Please contact HumanskeyAI support." };
+        };
+        if (company.adminUsername != username or company.adminPasswordHash != password) {
+          return { success = false; token = ""; companyCode = ""; companyName = ""; role = ""; errorMsg = "Invalid username or password" };
+        };
+        let token = generateToken();
+        let now = Time.now();
+        let session : CompanySession = {
+          token = token;
+          companyId = company.id;
+          companyCode = company.companyCode;
+          companyName = company.brandName;
+          username = username;
+          role = "company_admin";
+          siteId = "";
+          createdAt = now;
+          expiresAt = now + SESSION_TTL_NS;
+        };
+        companySessions := Array.filter(companySessions, func(s : CompanySession) : Bool {
+          isSessionValid(s.expiresAt);
+        });
+        companySessions := Array.append(companySessions, [session]);
+        { success = true; token = token; companyCode = company.companyCode; companyName = company.brandName; role = "company_admin"; errorMsg = "" };
+      };
+    };
+  };
+
+  public query func validateCompanySession(token : Text) : async ?CompanySession {
+    switch (Array.find(companySessions, func(s : CompanySession) : Bool { s.token == token })) {
+      case null null;
+      case (?session) {
+        if (isSessionValid(session.expiresAt)) ?session else null;
+      };
+    };
+  };
+
+  public func logoutCompanySession(token : Text) : async Bool {
+    let before = companySessions.size();
+    companySessions := Array.filter(companySessions, func(s : CompanySession) : Bool { s.token != token });
+    companySessions.size() < before;
+  };
+
+  // ── Super Admin Authentication ─────────────────────────────────────────
+
+  public func loginSuperAdmin(username : Text, password : Text) : async SuperAdminLoginResult {
+    if (username != "humanskeyai" or password != superAdminPassword) {
+      return { success = false; token = ""; errorMsg = "Invalid Super Admin credentials" };
+    };
+    let token = generateToken();
+    let now = Time.now();
+    let session : SuperAdminSession = {
+      token = token;
+      username = username;
+      createdAt = now;
+      expiresAt = now + SESSION_TTL_NS;
+    };
+    superAdminSessions := Array.filter(superAdminSessions, func(s : SuperAdminSession) : Bool {
+      isSessionValid(s.expiresAt);
+    });
+    superAdminSessions := Array.append(superAdminSessions, [session]);
+    { success = true; token = token; errorMsg = "" };
+  };
+
+  public query func validateSuperAdminSession(token : Text) : async ?SuperAdminSession {
+    switch (Array.find(superAdminSessions, func(s : SuperAdminSession) : Bool { s.token == token })) {
+      case null null;
+      case (?session) {
+        if (isSessionValid(session.expiresAt)) ?session else null;
+      };
+    };
+  };
+
+  public func logoutSuperAdminSession(token : Text) : async Bool {
+    let before = superAdminSessions.size();
+    superAdminSessions := Array.filter(superAdminSessions, func(s : SuperAdminSession) : Bool { s.token != token });
+    superAdminSessions.size() < before;
+  };
+
+  public func changeSuperAdminPassword(currentPassword : Text, newPassword : Text) : async Bool {
+    if (currentPassword != superAdminPassword) return false;
+    superAdminPassword := newPassword;
+    true;
+  };
+
+  public query func getPlatformStats() : async { totalCompanies : Nat; activeCompanies : Nat; suspendedCompanies : Nat; inactiveCompanies : Nat; totalEmployees : Nat } {
+    let total = companies.size();
+    var active : Nat = 0; var suspended : Nat = 0; var inactive : Nat = 0;
+    for (c in companies.vals()) {
+      if (c.status == "active") active += 1
+      else if (c.status == "suspended") suspended += 1
+      else inactive += 1;
+    };
+    { totalCompanies = total; activeCompanies = active; suspendedCompanies = suspended; inactiveCompanies = inactive; totalEmployees = employeesV2.size() };
   };
 
   // ── Trades ────────────────────────────────────────────────────────────
@@ -232,7 +591,27 @@ persistent actor {
     employeesV2 := Array.map(employeesV2, func(e : Employee) : Employee { if (e.id == id) { found := true; { emp with id = id; createdAt = e.createdAt } } else e }); found;
   };
 
-  // ── Attendance ────────────────────────────────────────────────────────
+  // ── Tenant-Aware Employee Methods ──────────────────────────────────────
+  public query func getEmployeesByCompany(companyCode : Text) : async { allEmployees : [TenantEmployee]; activeEmployees : [TenantEmployee] } {
+    let filtered = Array.filter(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == companyCode });
+    let active = Array.filter(filtered, func(e : TenantEmployee) : Bool { e.status == "active" });
+    { allEmployees = filtered; activeEmployees = active };
+  };
+  public func createEmployeeForCompany(companyCode : Text, emp : TenantEmployee) : async Bool {
+    let code = companyCode;
+    if (Array.find(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == code and e.employeeId == emp.employeeId }) != null) return false;
+    let newEmp = { emp with id = nextId(); companyCode = code; createdAt = Time.now() };
+    tenantEmployees := Array.append(tenantEmployees, [newEmp]); true;
+  };
+  public func updateEmployeeForCompany(companyCode : Text, id : Text, emp : TenantEmployee) : async Bool {
+    let code = companyCode;
+    var found = false;
+    tenantEmployees := Array.map(tenantEmployees, func(e : TenantEmployee) : TenantEmployee {
+      if (e.companyCode == code and e.id == id) { found := true; { emp with id = id; companyCode = code; createdAt = e.createdAt } } else e
+    }); found;
+  };
+
+  // ── Attendance (legacy non-tenant methods) ────────────────────────────
 
   public func markAttendance(employeeId : Text, date : Text, attStatus : Text, otHours : Float, punchIn : Text, punchOut : Text, lat : Float, lng : Float, source : Text) : async Bool {
     if (Array.find(attendanceV2, func(a : AttendanceRecord) : Bool { a.employeeId == employeeId and a.date == date }) != null) return false;
@@ -275,6 +654,187 @@ persistent actor {
   public func flagAttendance(id : Text, reason : Text) : async Bool {
     var found = false;
     attendanceV2 := Array.map(attendanceV2, func(a : AttendanceRecord) : AttendanceRecord { if (a.id == id) { found := true; { a with isFlagged = true; flagReason = reason; updatedAt = Time.now() } } else a }); found;
+  };
+
+  // ── Tenant-Aware Attendance Methods ────────────────────────────────────
+
+  // Get all attendance records for a company (used for initial sync / migration)
+  public query func getAllAttendanceByCompany(companyCode : Text) : async [TenantAttendanceRecord] {
+    Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool { a.companyCode == companyCode });
+  };
+
+  // Get attendance for a company filtered by month/year
+  public query func getAttendanceByCompanyAndMonth(companyCode : Text, month : Text, year : Text) : async [TenantAttendanceRecord] {
+    let mm = if (Text.size(month) == 1) "0" # month else month;
+    let prefix = year # mm;
+    Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+      a.companyCode == companyCode and Text.startsWith(a.date, #text prefix)
+    });
+  };
+
+  // Mark attendance for a company (skips duplicate)
+  public func markAttendanceForCompany(
+    companyCode : Text, employeeId : Text, date : Text,
+    attStatus : Text, otHours : Float, advanceAmount : Float,
+    punchIn : Text, punchOut : Text, lat : Float, lng : Float, source : Text
+  ) : async Bool {
+    let exists = Array.find(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+      a.companyCode == companyCode and a.employeeId == employeeId and a.date == date
+    });
+    if (exists != null) return false;
+    let now = Time.now();
+    tenantAttendance := Array.append(tenantAttendance, [{
+      id = nextId(); companyCode = companyCode; employeeId = employeeId; date = date;
+      status = attStatus; otHours = otHours; advanceAmount = advanceAmount;
+      punchIn = punchIn; punchOut = punchOut; lat = lat; lng = lng;
+      isFlagged = false; flagReason = ""; isRegularized = false; regularizationReason = "";
+      changedBy = source; updatedAt = now; createdAt = now;
+    }]);
+    true;
+  };
+
+  // Mark attendance overwrite (upsert)
+  public func markAttendanceOverwriteForCompany(
+    companyCode : Text, employeeId : Text, date : Text,
+    attStatus : Text, otHours : Float, advanceAmount : Float,
+    punchIn : Text, punchOut : Text, lat : Float, lng : Float, source : Text
+  ) : async () {
+    let now = Time.now();
+    let existing = Array.find(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+      a.companyCode == companyCode and a.employeeId == employeeId and a.date == date
+    });
+    let filtered = Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+      not (a.companyCode == companyCode and a.employeeId == employeeId and a.date == date)
+    });
+    let recId = switch (existing) { case (?r) r.id; case null nextId() };
+    let recCreatedAt = switch (existing) { case (?r) r.createdAt; case null now };
+    tenantAttendance := Array.append(filtered, [{
+      id = recId; companyCode = companyCode; employeeId = employeeId; date = date;
+      status = attStatus; otHours = otHours; advanceAmount = advanceAmount;
+      punchIn = punchIn; punchOut = punchOut; lat = lat; lng = lng;
+      isFlagged = false; flagReason = ""; isRegularized = false; regularizationReason = "";
+      changedBy = source; updatedAt = now; createdAt = recCreatedAt;
+    }]);
+  };
+
+  // Delete a single attendance record for a company
+  public func deleteAttendanceForCompany(companyCode : Text, employeeId : Text, date : Text) : async Bool {
+    let before = tenantAttendance.size();
+    tenantAttendance := Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+      not (a.companyCode == companyCode and a.employeeId == employeeId and a.date == date)
+    });
+    tenantAttendance.size() < before;
+  };
+
+  // Bulk mark attendance for a company (skip duplicates)
+  public func bulkMarkAttendanceForCompany(
+    companyCode : Text,
+    records : [(Text, Text, Text, Float)],
+    source : Text
+  ) : async { successCount : Nat; skippedCount : Nat; errors : [Text] } {
+    var success : Nat = 0;
+    var skipped : Nat = 0;
+    let now = Time.now();
+    for ((empId, date, attStatus, otHours) in records.vals()) {
+      let exists = Array.find(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+        a.companyCode == companyCode and a.employeeId == empId and a.date == date
+      });
+      if (exists != null) {
+        skipped += 1;
+      } else {
+        tenantAttendance := Array.append(tenantAttendance, [{
+          id = nextId(); companyCode = companyCode; employeeId = empId; date = date;
+          status = attStatus; otHours = otHours; advanceAmount = 0.0;
+          punchIn = ""; punchOut = ""; lat = 0.0; lng = 0.0;
+          isFlagged = false; flagReason = ""; isRegularized = false; regularizationReason = "";
+          changedBy = source; updatedAt = now; createdAt = now;
+        }]);
+        success += 1;
+      };
+    };
+    { successCount = success; skippedCount = skipped; errors = [] };
+  };
+
+  // Bulk mark attendance overwrite for a company
+  public func bulkMarkAttendanceOverwriteForCompany(
+    companyCode : Text,
+    records : [(Text, Text, Text, Float)],
+    source : Text
+  ) : async { successCount : Nat; skippedCount : Nat; errors : [Text] } {
+    var success : Nat = 0;
+    let now = Time.now();
+    for ((empId, date, attStatus, otHours) in records.vals()) {
+      let existing = Array.find(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+        a.companyCode == companyCode and a.employeeId == empId and a.date == date
+      });
+      let filtered = Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
+        not (a.companyCode == companyCode and a.employeeId == empId and a.date == date)
+      });
+      let recId = switch (existing) { case (?r) r.id; case null nextId() };
+      let recCreatedAt = switch (existing) { case (?r) r.createdAt; case null now };
+      let advAmt = switch (existing) { case (?r) r.advanceAmount; case null 0.0 };
+      tenantAttendance := Array.append(filtered, [{
+        id = recId; companyCode = companyCode; employeeId = empId; date = date;
+        status = attStatus; otHours = otHours; advanceAmount = advAmt;
+        punchIn = ""; punchOut = ""; lat = 0.0; lng = 0.0;
+        isFlagged = false; flagReason = ""; isRegularized = false; regularizationReason = "";
+        changedBy = source; updatedAt = now; createdAt = recCreatedAt;
+      }]);
+      success += 1;
+    };
+    { successCount = success; skippedCount = 0; errors = [] };
+  };
+
+  // Update OT for a tenant attendance record
+  public func updateAttendanceOTForCompany(
+    companyCode : Text, employeeId : Text, date : Text, otHours : Float, source : Text
+  ) : async Bool {
+    var found = false;
+    tenantAttendance := Array.map(tenantAttendance, func(a : TenantAttendanceRecord) : TenantAttendanceRecord {
+      if (a.companyCode == companyCode and a.employeeId == employeeId and a.date == date) {
+        found := true; { a with otHours = otHours; changedBy = source; updatedAt = Time.now() }
+      } else a
+    });
+    found;
+  };
+
+  // Update advance amount for a tenant attendance record
+  public func updateAttendanceAdvanceForCompany(
+    companyCode : Text, employeeId : Text, date : Text, advanceAmount : Float, source : Text
+  ) : async Bool {
+    var found = false;
+    tenantAttendance := Array.map(tenantAttendance, func(a : TenantAttendanceRecord) : TenantAttendanceRecord {
+      if (a.companyCode == companyCode and a.employeeId == employeeId and a.date == date) {
+        found := true; { a with advanceAmount = advanceAmount; changedBy = source; updatedAt = Time.now() }
+      } else a
+    });
+    found;
+  };
+
+  // Regularize a tenant attendance record
+  public func regularizeAttendanceForCompany(
+    companyCode : Text, id : Text, newStatus : Text, newOtHours : Float, reason : Text, changedBy : Text
+  ) : async Bool {
+    var found = false;
+    tenantAttendance := Array.map(tenantAttendance, func(a : TenantAttendanceRecord) : TenantAttendanceRecord {
+      if (a.companyCode == companyCode and a.id == id) {
+        found := true;
+        { a with status = newStatus; otHours = newOtHours; isRegularized = true;
+          regularizationReason = reason; changedBy = changedBy; updatedAt = Time.now() }
+      } else a
+    });
+    found;
+  };
+
+  // Flag a tenant attendance record
+  public func flagAttendanceForCompany(companyCode : Text, id : Text, reason : Text) : async Bool {
+    var found = false;
+    tenantAttendance := Array.map(tenantAttendance, func(a : TenantAttendanceRecord) : TenantAttendanceRecord {
+      if (a.companyCode == companyCode and a.id == id) {
+        found := true; { a with isFlagged = true; flagReason = reason; updatedAt = Time.now() }
+      } else a
+    });
+    found;
   };
 
   // ── Regularization Requests ───────────────────────────────────────────
@@ -413,6 +973,53 @@ persistent actor {
       } else p;
     });
     if (found) { auditLogs := Array.append(auditLogs, [{ id = nextId(); entityType = "payroll"; entityId = employeeId # "-" # Nat.toText(month) # "-" # Nat.toText(year); oldValue = oldVal; newValue = "manual override by " # overriddenBy; changedBy = overriddenBy; timestamp = Time.now(); reason = "Manual override" }]) };
+    found;
+  };
+
+  // ── Tenant-Aware Payroll Methods ────────────────────────────────────────
+
+  public query func getPayrollByCompanyAndMonth(companyCode : Text, month : Nat, year : Nat) : async [TenantPayrollRecord] {
+    Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
+      p.companyCode == companyCode and p.month == month and p.year == year
+    });
+  };
+
+  public func savePayrollForCompany(companyCode : Text, records : [TenantPayrollRecord]) : async Nat {
+    // Remove existing records for this company+month+year combination (based on first record's month/year)
+    // Then insert all provided records (upsert by employeeId+month+year)
+    var count : Nat = 0;
+    for (rec in records.vals()) {
+      // Remove any existing record for this employee+month+year
+      tenantPayroll := Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
+        not (p.companyCode == companyCode and p.employeeId == rec.employeeId and p.month == rec.month and p.year == rec.year)
+      });
+      let newRec = { rec with id = if (rec.id == "") nextId() else rec.id; companyCode = companyCode };
+      tenantPayroll := Array.append(tenantPayroll, [newRec]);
+      count += 1;
+    };
+    count;
+  };
+
+  public func deletePayrollForCompanyAndMonth(companyCode : Text, month : Nat, year : Nat) : async Nat {
+    let before = tenantPayroll.size();
+    tenantPayroll := Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
+      not (p.companyCode == companyCode and p.month == month and p.year == year)
+    });
+    before - tenantPayroll.size();
+  };
+
+  public func updatePayrollDeductionForCompany(
+    companyCode : Text, employeeId : Text, month : Nat, year : Nat,
+    ptDeduction : Float, advanceDeduction : Float, otherDeduction : Float
+  ) : async Bool {
+    var found = false;
+    tenantPayroll := Array.map(tenantPayroll, func(p : TenantPayrollRecord) : TenantPayrollRecord {
+      if (p.companyCode == companyCode and p.employeeId == employeeId and p.month == month and p.year == year) {
+        found := true;
+        let netPay = p.finalGross - p.pfDeduction - p.esiDeduction - ptDeduction - advanceDeduction - otherDeduction;
+        { p with ptDeduction = ptDeduction; advanceDeduction = advanceDeduction; otherDeduction = otherDeduction; netPay = netPay }
+      } else p
+    });
     found;
   };
 

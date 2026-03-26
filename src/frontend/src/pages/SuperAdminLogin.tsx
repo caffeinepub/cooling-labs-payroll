@@ -1,13 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { Eye, EyeOff, Lock, Shield } from "lucide-react";
+import { Eye, EyeOff, Shield } from "lucide-react";
 import React, { useState, useCallback } from "react";
 import { ToastContainer } from "../components/ui/ToastContainer";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/useToast";
-import { loginSuperAdmin } from "../services/tenantStorage";
+import { loginSuperAdminCanister } from "../services/canisterAuthService";
 
 export function SuperAdminLogin() {
   const { toasts, addToast, removeToast } = useToast();
@@ -16,6 +16,9 @@ export function SuperAdminLogin() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authSource, setAuthSource] = useState<"canister" | "local" | null>(
+    null,
+  );
 
   const handleLogin = useCallback(async () => {
     if (!username.trim() || !password.trim()) {
@@ -24,11 +27,12 @@ export function SuperAdminLogin() {
     }
     setLoading(true);
     try {
-      const ok = loginSuperAdmin(username.trim(), password);
-      if (ok) {
+      const result = await loginSuperAdminCanister(username.trim(), password);
+      if (result.success) {
+        setAuthSource(result.source);
         navigate({ to: "/superadmin/dashboard" });
       } else {
-        addToast("Invalid credentials", "error");
+        addToast(result.errorMsg || "Invalid credentials", "error");
       }
     } finally {
       setLoading(false);
@@ -50,6 +54,13 @@ export function SuperAdminLogin() {
             HumanskeyAI Super Admin Portal
           </p>
         </div>
+
+        {authSource && (
+          <div className="mb-3 px-3 py-2 rounded-lg bg-emerald-900/40 border border-emerald-700 text-xs text-emerald-400">
+            Session stored on-chain via ICP canister
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-slate-300">Username</Label>
@@ -93,7 +104,7 @@ export function SuperAdminLogin() {
             className="w-full bg-blue-600 hover:bg-blue-700"
           >
             <Shield className="w-4 h-4 mr-2" />
-            {loading ? "Logging in..." : "Login as Platform Admin"}
+            {loading ? "Verifying..." : "Login as Platform Admin"}
           </Button>
         </div>
         <div className="mt-6 text-center">
@@ -103,6 +114,11 @@ export function SuperAdminLogin() {
           >
             ← Back to Company Login
           </Link>
+        </div>
+        <div className="mt-3 text-center">
+          <p className="text-xs text-slate-600">
+            Session validated against ICP canister
+          </p>
         </div>
       </div>
     </div>

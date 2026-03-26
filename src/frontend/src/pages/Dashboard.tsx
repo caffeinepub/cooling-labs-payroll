@@ -91,9 +91,11 @@ export function Dashboard() {
     window.addEventListener("storage", handler);
     // Also refresh on same-tab attendance/payroll writes
     window.addEventListener("clf:attendance-updated", handler);
+    window.addEventListener("clf:payroll-updated", handler);
     return () => {
       window.removeEventListener("storage", handler);
       window.removeEventListener("clf:attendance-updated", handler);
+      window.removeEventListener("clf:payroll-updated", handler);
     };
   }, [load]);
 

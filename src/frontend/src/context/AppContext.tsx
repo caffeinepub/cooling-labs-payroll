@@ -6,6 +6,9 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
+import { syncAttendanceFromCanister } from "../services/canisterAttendanceService";
+import { loadEmployeesFromCanister } from "../services/canisterEmployeeService";
+import { syncPayrollFromCanister } from "../services/canisterPayrollService";
 import * as mastersStorage from "../services/mastersStorage";
 import * as workforceStorage from "../services/workforceStorage";
 import type { Department, Employee, Site, Supervisor, Trade } from "../types";
@@ -23,7 +26,9 @@ interface AppContextType {
   supervisors: Supervisor[];
   isAdmin: boolean;
   loading: boolean;
+  attendanceSynced: boolean;
   refreshEmployees: () => Promise<void>;
+  refreshAttendance: () => Promise<void>;
   refreshTrades: () => void;
   refreshDepartments: () => void;
   refreshSites: () => void;
@@ -42,7 +47,9 @@ const AppContext = createContext<AppContextType>({
   supervisors: [],
   isAdmin: false,
   loading: true,
+  attendanceSynced: false,
   refreshEmployees: async () => {},
+  refreshAttendance: async () => {},
   refreshTrades: () => {},
   refreshDepartments: () => {},
   refreshSites: () => {},
@@ -61,11 +68,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeSites, setActiveSites] = useState<Site[]>([]);
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [attendanceSynced, setAttendanceSynced] = useState(false);
 
   const refreshEmployees = useCallback(async () => {
-    const result = workforceStorage.getEmployees();
-    setEmployees(result.allEmployees);
-    setActiveEmployees(result.activeEmployees);
+    try {
+      const result = await loadEmployeesFromCanister();
+      setEmployees(result.allEmployees);
+      setActiveEmployees(result.activeEmployees);
+    } catch {
+      const result = workforceStorage.getEmployees();
+      setEmployees(result.allEmployees);
+      setActiveEmployees(result.activeEmployees);
+    }
+  }, []);
+
+  const refreshAttendance = useCallback(async () => {
+    try {
+      setAttendanceSynced(false);
+      const result = await syncAttendanceFromCanister();
+      setAttendanceSynced(true);
+      void syncPayrollFromCanister();
+      console.log(
+        `[AppContext] Attendance synced: ${result.count} records from ${result.source}`,
+      );
+    } catch (e) {
+      console.warn("[AppContext] Attendance sync failed:", e);
+      setAttendanceSynced(true); // Don't block UI
+    }
   }, []);
 
   const refreshTrades = useCallback(() => {
@@ -91,17 +120,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!adminLoggedIn) return;
+    if (!adminLoggedIn) {
+      setAttendanceSynced(false);
+      return;
+    }
     setLoading(true);
     refreshTrades();
     refreshDepartments();
     refreshSites();
     void refreshEmployees();
     void refreshSupervisors();
+    // Sync attendance from canister — seeds localStorage so all pages have fresh data
+    void refreshAttendance();
     setLoading(false);
   }, [
     adminLoggedIn,
     refreshEmployees,
+    refreshAttendance,
     refreshTrades,
     refreshDepartments,
     refreshSites,
@@ -122,7 +157,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supervisors,
         isAdmin: adminLoggedIn,
         loading,
+        attendanceSynced,
         refreshEmployees,
+        refreshAttendance,
         refreshTrades,
         refreshDepartments,
         refreshSites,

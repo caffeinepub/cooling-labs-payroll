@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   Building2,
+  KeyRound,
   LogOut,
   PauseCircle,
   Shield,
@@ -108,6 +109,15 @@ export function SuperAdminDashboard() {
                 className="text-slate-300 hover:text-white"
               >
                 <Building2 className="w-4 h-4 mr-1" /> Companies
+              </Button>
+            </Link>
+            <Link to="/superadmin/change-password">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-300 hover:text-white"
+              >
+                <KeyRound className="w-4 h-4 mr-1" /> Change Password
               </Button>
             </Link>
             <Button
