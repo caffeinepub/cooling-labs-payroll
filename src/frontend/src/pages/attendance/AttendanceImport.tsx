@@ -626,11 +626,39 @@ export function AttendanceImport() {
 
       const siteById = new Map<string, Site>();
       for (const s of sites) siteById.set(s.id, s);
+      const siteByName = new Map<string, Site>();
+      for (const s of sites) siteByName.set(s.name.trim().toLowerCase(), s);
+
+      // Normalize a site code value for comparison
+      const normalizeSiteCode = (val: unknown): string =>
+        String(val ?? "")
+          .replace(/\u00A0/g, " ")
+          .replace(/[\r\n]/g, "")
+          .trim()
+          .toUpperCase();
 
       const findSite = (code: string): Site | null => {
         if (!code) return null;
-        const lower = code.trim().toLowerCase();
-        for (const s of sites) if (s.id.toLowerCase() === lower) return s;
+        const norm = normalizeSiteCode(code);
+        console.debug(
+          "[AttendanceImport] findSite → raw:",
+          JSON.stringify(code),
+          "normalized:",
+          norm,
+        );
+        // Match against siteCode field (primary), then name (fallback)
+        for (const s of sites) {
+          const masterCode = normalizeSiteCode(s.siteCode);
+          console.debug(
+            "[AttendanceImport] comparing with master siteCode:",
+            JSON.stringify(s.siteCode),
+            "→",
+            masterCode,
+          );
+          if (masterCode && masterCode === norm) return s;
+        }
+        // Fallback: match by name
+        const lower = norm.toLowerCase();
         for (const s of sites)
           if (
             s.name.toLowerCase().includes(lower) ||
@@ -671,10 +699,24 @@ export function AttendanceImport() {
         const r = dataRows[i];
 
         const rawDateCell = r[colMap.date];
+        const rawSiteCodeVal =
+          colMap.siteCode !== undefined ? r[colMap.siteCode] : "";
         const siteCode =
           colMap.siteCode !== undefined
-            ? String(r[colMap.siteCode] ?? "").trim()
+            ? String(rawSiteCodeVal ?? "")
+                .replace(/\u00A0/g, " ")
+                .replace(/[\r\n]/g, "")
+                .trim()
+                .toUpperCase()
             : "";
+        console.debug(
+          "[AttendanceImport] Row",
+          i + 1,
+          "raw siteCode:",
+          JSON.stringify(rawSiteCodeVal),
+          "normalized:",
+          siteCode,
+        );
         const siteName =
           colMap.siteName !== undefined
             ? String(r[colMap.siteName] ?? "").trim()
@@ -747,21 +789,46 @@ export function AttendanceImport() {
 
         if (siteCode && !resolvedSite) {
           notes.push(`Site code "${siteCode}" not found in Site Master`);
-          if (importSettings.siteMismatchRule === "error") vStatus = "error";
-          else if (vStatus === "valid") vStatus = "warning";
-        } else if (
-          siteCode &&
-          resolvedSite &&
-          resolvedEmp &&
-          resolvedEmp.site !== resolvedSite.id
-        ) {
-          notes.push(
-            `Site mismatch: employee assigned to "${
-              siteById.get(resolvedEmp.site)?.name ?? resolvedEmp.site
-            }", file says "${resolvedSite.name}"`,
+          console.debug(
+            "[AttendanceImport] No site match found for:",
+            siteCode,
+            "| Available site codes:",
+            sites.map((s) => s.siteCode),
           );
           if (importSettings.siteMismatchRule === "error") vStatus = "error";
           else if (vStatus === "valid") vStatus = "warning";
+        } else {
+          if (resolvedSite)
+            console.debug(
+              "[AttendanceImport] Site matched:",
+              resolvedSite.siteCode,
+              resolvedSite.name,
+            );
+        }
+        if (siteCode && resolvedSite && resolvedEmp) {
+          // Employee.site stores site NAME (not ID). Resolve employee's site by name.
+          const empSiteName = resolvedEmp.site?.trim() ?? "";
+          const fileSiteName = resolvedSite.name?.trim() ?? "";
+          // Also resolve employee site via siteByName for canonical comparison
+          const empSiteResolved = siteByName.get(empSiteName.toLowerCase());
+          const empSiteCanonical = empSiteResolved
+            ? empSiteResolved.id
+            : empSiteName.toLowerCase();
+          const fileSiteCanonical = resolvedSite.id;
+
+          // Only warn if employee's site name differs from file's site name (case-insensitive)
+          if (
+            empSiteName &&
+            fileSiteName &&
+            empSiteName.toLowerCase() !== fileSiteName.toLowerCase() &&
+            empSiteCanonical !== fileSiteCanonical
+          ) {
+            notes.push(
+              `Site mismatch: employee assigned to "${empSiteName}", file says "${fileSiteName}"`,
+            );
+            if (importSettings.siteMismatchRule === "error") vStatus = "error";
+            else if (vStatus === "valid") vStatus = "warning";
+          }
         }
 
         if (!rawStatusVal) {
@@ -934,7 +1001,12 @@ export function AttendanceImport() {
         continue;
       }
 
-      if (emp.site) involvedSiteIds.add(emp.site);
+      if (emp.site) {
+        const empSite = sites.find(
+          (s) => s.name.trim().toLowerCase() === emp.site!.trim().toLowerCase(),
+        );
+        if (empSite) involvedSiteIds.add(empSite.id);
+      }
       if (row.resolvedSiteId) involvedSiteIds.add(row.resolvedSiteId);
 
       const source = row.advance > 0 ? `import|adv:${row.advance}` : "import";
@@ -1050,6 +1122,7 @@ export function AttendanceImport() {
     adminName,
     supervisorSession,
     supervisorSiteIds,
+    sites,
   ]);
 
   // ---------------------------------------------------------------------------
