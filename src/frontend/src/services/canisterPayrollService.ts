@@ -28,7 +28,7 @@ import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 /** The localStorage key used by payrollStorage for the active company */
 function payrollLSKey(): string {
-  return `clf_${getActiveCompanyId()}_clf_payroll`;
+  return getTenantKey(getActiveCompanyId(), "clf_payroll");
 }
 
 /** Convert a PayrollBreakdownExtended to TenantPayrollRecord for canister storage */

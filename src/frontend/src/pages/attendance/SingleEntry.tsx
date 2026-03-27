@@ -14,6 +14,10 @@ import {
 import { useAppContext } from "../../context/AppContext";
 import { useToast } from "../../hooks/useToast";
 import * as attendanceStorage from "../../services/attendanceStorage";
+import {
+  markAttendanceInCanister,
+  markAttendanceOverwriteInCanister,
+} from "../../services/canisterAttendanceService";
 
 const STATUS_OPTIONS = ["Present", "Absent", "HalfDay", "Leave"] as const;
 type AttStatus = (typeof STATUS_OPTIONS)[number];
@@ -112,6 +116,20 @@ export function SingleEntry() {
               lng,
               "admin",
             ) !== false;
+          if (ok) {
+            void markAttendanceOverwriteInCanister(
+              empId,
+              dateStr,
+              status,
+              ot,
+              punchIn,
+              punchOut,
+              lat,
+              lng,
+              "admin",
+              0,
+            );
+          }
         } else {
           ok =
             attendanceStorage.markAttendance(
@@ -125,6 +143,20 @@ export function SingleEntry() {
               lng,
               "admin",
             ) !== false;
+          if (ok) {
+            void markAttendanceInCanister(
+              empId,
+              dateStr,
+              status,
+              ot,
+              punchIn,
+              punchOut,
+              lat,
+              lng,
+              "admin",
+              0,
+            );
+          }
         }
         if (ok) successCount++;
         else skipCount++;

@@ -12,6 +12,10 @@ import { Label } from "../../components/ui/label";
 import { useAppContext } from "../../context/AppContext";
 import { useToast } from "../../hooks/useToast";
 import * as attendanceStorage from "../../services/attendanceStorage";
+import {
+  bulkMarkAttendanceInCanister,
+  bulkMarkAttendanceOverwriteInCanister,
+} from "../../services/canisterAttendanceService";
 import type { Employee } from "../../types";
 
 const STATUS_OPTS = ["Present", "Absent", "HalfDay", "Leave"];
@@ -138,8 +142,10 @@ export function BulkAttendance() {
       let res: { successCount: bigint; skippedCount: bigint; errors: string[] };
       if (overwrite) {
         res = attendanceStorage.bulkMarkAttendanceOverwrite(entries, "admin");
+        void bulkMarkAttendanceOverwriteInCanister(entries, "admin");
       } else {
         res = attendanceStorage.bulkMarkAttendance(entries, "admin");
+        void bulkMarkAttendanceInCanister(entries, "admin");
       }
       setResult({
         success: res.successCount,

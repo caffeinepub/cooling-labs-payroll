@@ -14,7 +14,7 @@
 import type { AttendanceRecord } from "../types";
 import * as attendanceStorage from "./attendanceStorage";
 import { backendService } from "./backendService";
-import { getActiveCompanyId } from "./tenantStorage";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 type TenantAttRaw = Record<string, unknown>;
 
@@ -148,7 +148,7 @@ function seedLocalStorage(
   records: AttendanceRecord[],
 ): void {
   // attendanceStorage uses getTenantKey internally; we write raw records directly
-  const key = `clf_${companyCode}_clf_attendance`;
+  const key = getTenantKey(companyCode, "clf_attendance");
   const rawRecords = records.map((r) => ({
     ...r,
     updatedAt: Number(r.updatedAt),
