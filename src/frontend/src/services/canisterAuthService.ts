@@ -104,18 +104,19 @@ export async function loginCompanyCanister(
       console.log("[CanisterAuth] Company login via canister:", companyCode);
       return { success: true, session, errorMsg: "", source: "canister" };
     }
-    return {
-      success: false,
-      session: null,
-      errorMsg: result.errorMsg || "Login failed",
-      source: "canister",
-    };
+    // Canister returned success:false — fall through to local fallback
+    console.warn(
+      "[CanisterAuth] Canister returned failure, falling back to local. Reason:",
+      result.errorMsg,
+    );
   } catch (err) {
     console.warn(
       "[CanisterAuth] Canister login failed, falling back to local:",
       err,
     );
-    // Fallback: use localStorage-based tenantStorage
+  }
+  // Local fallback (runs on canister error OR canister success:false)
+  {
     const localSession = localLoginCompany(companyCode, username, password);
     if (localSession) {
       const session: CanisterCompanySession = {
@@ -275,17 +276,19 @@ export async function loginSuperAdminCanister(
       console.log("[CanisterAuth] Super Admin login via canister");
       return { success: true, session, errorMsg: "", source: "canister" };
     }
-    return {
-      success: false,
-      session: null,
-      errorMsg: result.errorMsg || "Login failed",
-      source: "canister",
-    };
+    // Canister returned success:false — fall through to local fallback
+    console.warn(
+      "[CanisterAuth] Canister SA returned failure, falling back to local. Reason:",
+      result.errorMsg,
+    );
   } catch (err) {
     console.warn(
       "[CanisterAuth] Canister super admin login failed, falling back to local:",
       err,
     );
+  }
+  // Local fallback
+  {
     const ok = localLoginSuperAdmin(username, password);
     if (ok) {
       const session: CanisterSuperAdminSession = {

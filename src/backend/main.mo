@@ -420,6 +420,8 @@ persistent actor {
   // ── Company Authentication ─────────────────────────────────────────────
 
   public func loginCompany(companyCode : Text, username : Text, password : Text) : async LoginResult {
+    // Bootstrap guard: if stable storage was reset, re-seed defaults
+    if (companies.size() == 0) { bootstrapDefaultCompanies() };
     let upper = Text.map(companyCode, func(c : Char) : Char {
       if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
     });
