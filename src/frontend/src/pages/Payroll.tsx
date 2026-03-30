@@ -363,8 +363,40 @@ export function Payroll() {
         );
         void loadPayroll();
         setOverwriteOpen(false);
-      } catch {
-        addToast("Generation failed", "error");
+      } catch (err: any) {
+        const msg: string = err?.message ?? "";
+        if (msg.includes("NO_EMPLOYEES")) {
+          addToast(
+            "No employees found for this company. Please add employees first.",
+            "error",
+          );
+        } else if (msg.includes("NO_ATTENDANCE")) {
+          const MONTHS = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ];
+          addToast(
+            `No attendance found for ${MONTHS[month - 1]} ${year}. Please enter attendance before generating payroll.`,
+            "error",
+          );
+        } else if (msg.includes("ALREADY_EXISTS")) {
+          addToast(
+            "Payroll already exists for all employees this month. Use Re-generate to overwrite.",
+            "info",
+          );
+        } else {
+          addToast(`Generation failed: ${msg || "Unknown error"}`, "error");
+        }
       } finally {
         setGenerating(false);
       }

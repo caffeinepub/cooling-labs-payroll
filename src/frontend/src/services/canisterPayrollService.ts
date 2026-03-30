@@ -11,7 +11,10 @@
  */
 
 import type { TenantPayrollRecord } from "../backend.d";
+import { getAttendanceByMonth } from "./attendanceStorage";
 import { backendService } from "./backendService";
+import { syncAttendanceFromCanister } from "./canisterAttendanceService";
+import { loadEmployeesFromCanister } from "./canisterEmployeeService";
 import {
   generatePayroll,
   getPayrollWithBreakdown,
@@ -216,25 +219,71 @@ function seedLocalStorageAll(
 /**
  * Generate payroll for a month using local computation engine,
  * then save all generated records to canister.
+ * Pre-syncs employees and attendance from canister before generating.
  */
 export async function generateAndSavePayroll(
   month: number,
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
+
+  // Step 1: sync employees and attendance from canister so local engine has fresh data
+  await Promise.all([
+    loadEmployeesFromCanister(),
+    syncAttendanceFromCanister(),
+  ]);
+
+  // Step 2: run local payroll engine (reads from localStorage which is now populated)
   const result = generatePayroll(BigInt(month), BigInt(year), "admin");
+
+  // Step 3: if no rows were generated, diagnose why and throw a descriptive error
+  if (Number(result.generatedCount) === 0) {
+    const empKey = getTenantKey(companyCode, "clf_employees");
+    let localEmps: any[] = [];
+    try {
+      const raw = localStorage.getItem(empKey);
+      if (raw) localEmps = JSON.parse(raw);
+    } catch {}
+
+    if (localEmps.length === 0) {
+      throw new Error("NO_EMPLOYEES");
+    }
+
+    const attRecords = getAttendanceByMonth(String(month), String(year));
+    if (attRecords.length === 0) {
+      throw new Error("NO_ATTENDANCE");
+    }
+
+    // Employees and attendance exist — payroll already exists for all of them
+    throw new Error("ALREADY_EXISTS");
+  }
+
+  // Step 4: push generated records to canister
   await pushMonthToCanister(companyCode, month, year);
+
+  // Step 5: re-sync from canister to confirm save worked
+  await syncPayrollFromCanister();
+
   return { generatedCount: Number(result.generatedCount) };
 }
 
 /**
  * Overwrite payroll for a month: delete canister records, recompute, save.
+ * Pre-syncs employees and attendance from canister before generating.
  */
 export async function overwriteAndSavePayroll(
   month: number,
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
+
+  // Step 1: sync employees and attendance from canister so local engine has fresh data
+  await Promise.all([
+    loadEmployeesFromCanister(),
+    syncAttendanceFromCanister(),
+  ]);
+
+  // Step 2: delete existing canister records for this month
   try {
     await backendService.deletePayrollForCompanyAndMonth(
       companyCode,
@@ -244,8 +293,33 @@ export async function overwriteAndSavePayroll(
   } catch (e) {
     console.warn("[CanisterPayroll] Delete before overwrite failed:", e);
   }
+
+  // Step 3: overwrite local payroll and push to canister
   const result = overwritePayroll(BigInt(month), BigInt(year), "admin");
+
+  if (Number(result.generatedCount) === 0) {
+    const empKey = getTenantKey(companyCode, "clf_employees");
+    let localEmps: any[] = [];
+    try {
+      const raw = localStorage.getItem(empKey);
+      if (raw) localEmps = JSON.parse(raw);
+    } catch {}
+
+    if (localEmps.length === 0) {
+      throw new Error("NO_EMPLOYEES");
+    }
+
+    const attRecords = getAttendanceByMonth(String(month), String(year));
+    if (attRecords.length === 0) {
+      throw new Error("NO_ATTENDANCE");
+    }
+
+    throw new Error("ALREADY_EXISTS");
+  }
+
   await pushMonthToCanister(companyCode, month, year);
+  await syncPayrollFromCanister();
+
   return { generatedCount: Number(result.generatedCount) };
 }
 
