@@ -146,24 +146,31 @@ export function Companies() {
     }
     setLoading(true);
     const localCompanies = getCompanies();
+    // First merge any locally-created companies to canister (true merge, not skip-if-any)
     migrateLocalCompaniesToCanister(localCompanies)
       .then(() => canisterGetCompanies())
       .then((list) => {
-        setCompanies(list.length > 0 ? list : localCompanies);
+        // Always trust canister as source of truth — no localStorage fallback
+        setCompanies(list);
         setLoading(false);
       })
       .catch(() => {
-        setCompanies(localCompanies);
+        // On canister error, show empty with error (not stale local data)
+        setCompanies([]);
         setLoading(false);
+        toast.error("Failed to load companies from canister. Please refresh.");
       });
   }, [navigate]);
 
   const refreshCompanies = useCallback(async () => {
     try {
       const list = await canisterGetCompanies();
-      if (list.length > 0) setCompanies(list);
-    } catch {
-      // silent
+      setCompanies(list);
+    } catch (err) {
+      console.error("[Companies] refreshCompanies failed:", err);
+      toast.error(
+        "Failed to refresh companies from backend. Please try again.",
+      );
     }
   }, []);
 

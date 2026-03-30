@@ -2,11 +2,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   Building2,
+  Clock,
   KeyRound,
   Layers,
   LogOut,
   PauseCircle,
   Plus,
+  RefreshCw,
   Settings,
   Shield,
   Users,
@@ -69,6 +71,8 @@ export function SuperAdminDashboard() {
     totalUsers: 0,
   });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     const session = getSuperAdminSession();
@@ -80,39 +84,99 @@ export function SuperAdminDashboard() {
     Promise.all([canisterGetPlatformStats(), canisterGetCompanies()])
       .then(([platformStats, list]) => {
         const ps = platformStats;
-        setStats({
-          totalCompanies: ps?.totalCompanies ?? list.length,
-          activeCompanies:
-            ps?.activeCompanies ??
-            list.filter((c) => c.status === "active").length,
-          suspendedCompanies:
-            ps?.suspendedCompanies ??
-            list.filter((c) => c.status === "suspended").length,
-          inactiveCompanies:
-            ps?.inactiveCompanies ??
-            list.filter((c) => c.status === "inactive").length,
-          trialCompanies:
-            ps?.trialCompanies ??
-            list.filter((c) => c.planStatus === "trial").length,
-          paidCompanies:
-            ps?.paidCompanies ??
-            list.filter((c) => c.planStatus === "active").length,
+        // Always compute from list — this is the ground truth from canister
+        const fromList = {
+          totalCompanies: list.length,
+          activeCompanies: list.filter((c) => c.status === "active").length,
+          suspendedCompanies: list.filter((c) => c.status === "suspended")
+            .length,
+          inactiveCompanies: list.filter((c) => c.status === "inactive").length,
+          trialCompanies: list.filter((c) => c.planStatus === "trial").length,
+          paidCompanies: list.filter((c) => c.planStatus === "active").length,
           totalEmployees: ps?.totalEmployees ?? 0,
-          totalUsers: ps?.totalUsers ?? 0,
-        });
+          totalUsers: ps?.totalUsers ?? list.length,
+        };
+        // Use canister aggregate stats only if they show non-zero (they may be stale/empty)
+        const useCanisterStats = ps && ps.totalCompanies > 0;
+        setStats(
+          useCanisterStats
+            ? {
+                totalCompanies: ps.totalCompanies,
+                activeCompanies: ps.activeCompanies,
+                suspendedCompanies: ps.suspendedCompanies,
+                inactiveCompanies: ps.inactiveCompanies,
+                trialCompanies: ps.trialCompanies,
+                paidCompanies: ps.paidCompanies,
+                totalEmployees: ps.totalEmployees,
+                totalUsers: ps.totalUsers,
+              }
+            : fromList,
+        );
         // Recent 5 by createdAt
         const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt);
         setCompanies(sorted.slice(0, 5));
       })
-      .catch(() => {
-        // silent
+      .catch((err) => {
+        console.error("[SuperAdminDashboard] fetch failed", err);
+        setFetchError(
+          "Failed to load platform data from backend. Please refresh.",
+        );
       })
-      .finally(() => setLoadingStats(false));
+      .finally(() => {
+        setLoadingStats(false);
+        setLastRefreshed(new Date());
+      });
   }, [navigate]);
 
   const handleLogout = () => {
     clearSuperAdminSession();
     navigate({ to: "/superadmin/login" });
+  };
+
+  const handleRefresh = () => {
+    const session = getSuperAdminSession();
+    if (!session) return;
+    setLoadingStats(true);
+    Promise.all([canisterGetPlatformStats(), canisterGetCompanies()])
+      .then(([platformStats, list]) => {
+        const ps = platformStats;
+        const fromList = {
+          totalCompanies: list.length,
+          activeCompanies: list.filter((c) => c.status === "active").length,
+          suspendedCompanies: list.filter((c) => c.status === "suspended")
+            .length,
+          inactiveCompanies: list.filter((c) => c.status === "inactive").length,
+          trialCompanies: list.filter((c) => c.planStatus === "trial").length,
+          paidCompanies: list.filter((c) => c.planStatus === "active").length,
+          totalEmployees: ps?.totalEmployees ?? 0,
+          totalUsers: ps?.totalUsers ?? list.length,
+        };
+        const useCanisterStats = ps && ps.totalCompanies > 0;
+        setStats(
+          useCanisterStats
+            ? {
+                totalCompanies: ps.totalCompanies,
+                activeCompanies: ps.activeCompanies,
+                suspendedCompanies: ps.suspendedCompanies,
+                inactiveCompanies: ps.inactiveCompanies,
+                trialCompanies: ps.trialCompanies,
+                paidCompanies: ps.paidCompanies,
+                totalEmployees: ps.totalEmployees,
+                totalUsers: ps.totalUsers,
+              }
+            : fromList,
+        );
+        const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt);
+        setCompanies(sorted.slice(0, 5));
+      })
+      .catch((err) => {
+        console.error("[SuperAdminDashboard] refresh failed", err);
+        setFetchError("Refresh failed. Backend may be unavailable.");
+      })
+      .finally(() => {
+        setLoadingStats(false);
+        setLastRefreshed(new Date());
+      });
   };
 
   return (
@@ -122,6 +186,19 @@ export function SuperAdminDashboard() {
         background: "linear-gradient(180deg, #0B1220 0%, #0F1B2D 100%)",
       }}
     >
+      {/* Backend error banner */}
+      {fetchError && (
+        <div className="bg-red-900/80 border-b border-red-700 px-6 py-3 text-red-200 text-sm flex items-center justify-between">
+          <span>⚠ {fetchError}</span>
+          <button
+            type="button"
+            onClick={() => setFetchError(null)}
+            className="text-red-400 hover:text-red-200 ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Top nav */}
       <header className="border-b border-slate-700 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -180,11 +257,33 @@ export function SuperAdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-7">
-          <h1 className="text-2xl font-bold text-white">Platform Dashboard</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            HumanskeyAI SaaS control center — all tenants at a glance
-          </p>
+        <div className="mb-7 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              Platform Dashboard
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              HumanskeyAI SaaS control center — all tenants at a glance
+            </p>
+            {lastRefreshed && (
+              <p className="text-slate-500 text-xs mt-1 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Last refreshed: {lastRefreshed.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loadingStats}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 mt-1"
+            data-ocid="dashboard.refresh.button"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${loadingStats ? "animate-spin" : ""}`}
+            />
+            {loadingStats ? "Loading..." : "Refresh"}
+          </button>
         </div>
 
         {/* Stats Grid */}

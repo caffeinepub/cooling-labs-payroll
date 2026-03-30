@@ -54,6 +54,39 @@ const Employee = IDL.Record({
   createdAt: IDL.Int,
 });
 
+const TenantEmployee = IDL.Record({
+  id: IDL.Text,
+  companyCode: IDL.Text,
+  employeeId: IDL.Text,
+  name: IDL.Text,
+  mobile: IDL.Text,
+  site: IDL.Text,
+  tradeId: IDL.Text,
+  departmentId: IDL.Text,
+  status: IDL.Text,
+  salaryMode: IDL.Text,
+  cityType: IDL.Text,
+  basicSalary: IDL.Float64,
+  hra: IDL.Float64,
+  conveyance: IDL.Float64,
+  specialAllowance: IDL.Float64,
+  otherAllowance: IDL.Float64,
+  otRate: IDL.Float64,
+  pfApplicable: IDL.Bool,
+  esiApplicable: IDL.Bool,
+  aadhaarNumber: IDL.Text,
+  panNumber: IDL.Text,
+  uanNumber: IDL.Text,
+  esiNumber: IDL.Text,
+  bankAccountHolderName: IDL.Text,
+  bankAccountNumber: IDL.Text,
+  ifscCode: IDL.Text,
+  bankName: IDL.Text,
+  branchAddress: IDL.Text,
+  dateOfJoining: IDL.Text,
+  createdAt: IDL.Int,
+});
+
 const AttendanceRecord = IDL.Record({
   id: IDL.Text,
   employeeId: IDL.Text,
@@ -71,6 +104,56 @@ const AttendanceRecord = IDL.Record({
   changedBy: IDL.Text,
   updatedAt: IDL.Int,
   createdAt: IDL.Int,
+});
+
+const TenantAttendanceRecord = IDL.Record({
+  id: IDL.Text,
+  companyCode: IDL.Text,
+  employeeId: IDL.Text,
+  date: IDL.Text,
+  status: IDL.Text,
+  otHours: IDL.Float64,
+  advanceAmount: IDL.Float64,
+  punchIn: IDL.Text,
+  punchOut: IDL.Text,
+  lat: IDL.Float64,
+  lng: IDL.Float64,
+  isFlagged: IDL.Bool,
+  flagReason: IDL.Text,
+  isRegularized: IDL.Bool,
+  regularizationReason: IDL.Text,
+  changedBy: IDL.Text,
+  updatedAt: IDL.Int,
+  createdAt: IDL.Int,
+});
+
+const TenantPayrollRecord = IDL.Record({
+  id: IDL.Text,
+  companyCode: IDL.Text,
+  employeeId: IDL.Text,
+  month: IDL.Nat,
+  year: IDL.Nat,
+  earnedBasic: IDL.Float64,
+  earnedHra: IDL.Float64,
+  earnedConveyance: IDL.Float64,
+  earnedSpecialAllowance: IDL.Float64,
+  earnedOtherAllowance: IDL.Float64,
+  earnedGross: IDL.Float64,
+  otPay: IDL.Float64,
+  finalGross: IDL.Float64,
+  pfDeduction: IDL.Float64,
+  esiDeduction: IDL.Float64,
+  ptDeduction: IDL.Float64,
+  advanceDeduction: IDL.Float64,
+  otherDeduction: IDL.Float64,
+  netPay: IDL.Float64,
+  paidDays: IDL.Float64,
+  presentDays: IDL.Float64,
+  halfDays: IDL.Float64,
+  lopDays: IDL.Float64,
+  totalDaysInMonth: IDL.Nat,
+  otHours: IDL.Float64,
+  generatedAt: IDL.Int,
 });
 
 const PayrollRecord = IDL.Record({
@@ -126,9 +209,128 @@ const Supervisor = IDL.Record({
   active: IDL.Bool,
 });
 
+const RegularizationRequest = IDL.Record({
+  id: IDL.Text,
+  employeeId: IDL.Text,
+  date: IDL.Text,
+  oldStatus: IDL.Text,
+  requestedStatus: IDL.Text,
+  reason: IDL.Text,
+  requestedBy: IDL.Text,
+  approvalStatus: IDL.Text,
+  approvedBy: IDL.Text,
+  approvedAt: IDL.Int,
+  createdAt: IDL.Int,
+});
+
+// Company / Auth types
+const CompanyFull = IDL.Record({
+  id: IDL.Text,
+  companyCode: IDL.Text,
+  companyName: IDL.Text,
+  legalName: IDL.Text,
+  brandName: IDL.Text,
+  address: IDL.Text,
+  state: IDL.Text,
+  country: IDL.Text,
+  status: IDL.Text,
+  adminUsername: IDL.Text,
+  adminPasswordHash: IDL.Text,
+  planStatus: IDL.Text,
+  moduleAccess: IDL.Vec(IDL.Text),
+  logoDataUrl: IDL.Text,
+  notes: IDL.Text,
+  updatedAt: IDL.Int,
+  createdAt: IDL.Int,
+});
+
+const CompanySession = IDL.Record({
+  token: IDL.Text,
+  companyId: IDL.Text,
+  companyCode: IDL.Text,
+  companyName: IDL.Text,
+  username: IDL.Text,
+  role: IDL.Text,
+  siteId: IDL.Text,
+  createdAt: IDL.Int,
+  expiresAt: IDL.Int,
+});
+
+const SuperAdminSession = IDL.Record({
+  token: IDL.Text,
+  username: IDL.Text,
+  createdAt: IDL.Int,
+  expiresAt: IDL.Int,
+});
+
+const LoginResult = IDL.Record({
+  success: IDL.Bool,
+  token: IDL.Text,
+  companyCode: IDL.Text,
+  companyName: IDL.Text,
+  role: IDL.Text,
+  errorMsg: IDL.Text,
+});
+
+const SuperAdminLoginResult = IDL.Record({
+  success: IDL.Bool,
+  token: IDL.Text,
+  errorMsg: IDL.Text,
+});
+
+const PlatformStats = IDL.Record({
+  totalCompanies: IDL.Nat,
+  activeCompanies: IDL.Nat,
+  suspendedCompanies: IDL.Nat,
+  inactiveCompanies: IDL.Nat,
+  trialCompanies: IDL.Nat,
+  paidCompanies: IDL.Nat,
+  totalEmployees: IDL.Nat,
+  totalUsers: IDL.Nat,
+});
+
+const TenantSummary = IDL.Record({
+  employeeCount: IDL.Nat,
+  attendanceCount: IDL.Nat,
+  payrollCount: IDL.Nat,
+  status: IDL.Text,
+  plan: IDL.Text,
+  modules: IDL.Vec(IDL.Text),
+  createdAt: IDL.Int,
+  updatedAt: IDL.Int,
+});
+
 export const idlService = IDL.Service({
   isCallerAdmin: IDL.Func([], [IDL.Bool], []),
 
+  // ── Company / Auth ────────────────────────────────────────────────
+  getCompanies: IDL.Func([], [IDL.Vec(CompanyFull)], ['query']),
+  ensureCompaniesBootstrapped: IDL.Func([], [IDL.Nat], []),
+  getCompaniesUpdate: IDL.Func([], [IDL.Vec(CompanyFull)], []),
+  getCompanyByCode: IDL.Func([IDL.Text], [IDL.Opt(CompanyFull)], ['query']),
+  createCompany: IDL.Func([
+    IDL.Text, IDL.Text, IDL.Text, IDL.Text,
+    IDL.Text, IDL.Text, IDL.Text,
+    IDL.Text, IDL.Text, IDL.Text, IDL.Vec(IDL.Text), IDL.Text,
+  ], [IDL.Bool], []),
+  updateCompany: IDL.Func([
+    IDL.Text, IDL.Text, IDL.Text, IDL.Text,
+    IDL.Text, IDL.Text, IDL.Text,
+    IDL.Text, IDL.Text, IDL.Vec(IDL.Text), IDL.Text, IDL.Text,
+  ], [IDL.Bool], []),
+  updateCompanyStatus: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  updateCompanyAdminPassword: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  loginCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [LoginResult], []),
+  validateCompanySession: IDL.Func([IDL.Text], [IDL.Opt(CompanySession)], ['query']),
+  logoutCompanySession: IDL.Func([IDL.Text], [IDL.Bool], []),
+  loginSuperAdmin: IDL.Func([IDL.Text, IDL.Text], [SuperAdminLoginResult], []),
+  validateSuperAdminSession: IDL.Func([IDL.Text], [IDL.Opt(SuperAdminSession)], ['query']),
+  logoutSuperAdminSession: IDL.Func([IDL.Text], [IDL.Bool], []),
+  changeSuperAdminPassword: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  getPlatformStats: IDL.Func([], [PlatformStats], ['query']),
+  getTenantSummary: IDL.Func([IDL.Text], [TenantSummary], ['query']),
+
+  // ── Masters ───────────────────────────────────────────────────────
   getTrades: IDL.Func([], [IDL.Record({ trades: IDL.Vec(Trade), activeTrades: IDL.Vec(Trade) })], ['query']),
   createTrade: IDL.Func([IDL.Text], [IDL.Bool], []),
   updateTrade: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
@@ -141,10 +343,16 @@ export const idlService = IDL.Service({
   createSite: IDL.Func([IDL.Text, IDL.Float64, IDL.Float64, IDL.Float64], [IDL.Bool], []),
   updateSite: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Float64], [IDL.Bool], []),
 
+  // ── Employees ─────────────────────────────────────────────────────
   getEmployees: IDL.Func([], [IDL.Record({ allEmployees: IDL.Vec(Employee), activeEmployees: IDL.Vec(Employee) })], ['query']),
   createEmployee: IDL.Func([Employee], [IDL.Bool], []),
   updateEmployee: IDL.Func([IDL.Text, Employee], [IDL.Bool], []),
 
+  getEmployeesByCompany: IDL.Func([IDL.Text], [IDL.Record({ allEmployees: IDL.Vec(TenantEmployee), activeEmployees: IDL.Vec(TenantEmployee) })], ['query']),
+  createEmployeeForCompany: IDL.Func([IDL.Text, TenantEmployee], [IDL.Bool], []),
+  updateEmployeeForCompany: IDL.Func([IDL.Text, IDL.Text, TenantEmployee], [IDL.Bool], []),
+
+  // ── Attendance ────────────────────────────────────────────────────
   markAttendance: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text], [IDL.Bool], []),
   updateAttendanceOT: IDL.Func([IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
   bulkMarkAttendance: IDL.Func(
@@ -157,23 +365,73 @@ export const idlService = IDL.Service({
   regularizeAttendance: IDL.Func([IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
   flagAttendance: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
 
+  getAllAttendanceByCompany: IDL.Func([IDL.Text], [IDL.Vec(TenantAttendanceRecord)], ['query']),
+  getAttendanceByCompanyAndMonth: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Vec(TenantAttendanceRecord)], ['query']),
+  markAttendanceForCompany: IDL.Func([
+    IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64,
+    IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text,
+  ], [IDL.Bool], []),
+  markAttendanceOverwriteForCompany: IDL.Func([
+    IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64,
+    IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text,
+  ], [IDL.Bool], []),
+  deleteAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+  bulkMarkAttendanceForCompany: IDL.Func([
+    IDL.Text,
+    IDL.Vec(IDL.Record({
+      employeeId: IDL.Text, date: IDL.Text, status: IDL.Text,
+      otHours: IDL.Float64, advanceAmount: IDL.Float64,
+    })),
+    IDL.Text,
+  ], [IDL.Record({ successCount: IDL.Nat, skippedCount: IDL.Nat, errors: IDL.Vec(IDL.Text) })], []),
+  bulkMarkAttendanceOverwriteForCompany: IDL.Func([
+    IDL.Text,
+    IDL.Vec(IDL.Record({
+      employeeId: IDL.Text, date: IDL.Text, status: IDL.Text,
+      otHours: IDL.Float64, advanceAmount: IDL.Float64,
+    })),
+    IDL.Text,
+  ], [IDL.Record({ successCount: IDL.Nat, skippedCount: IDL.Nat, errors: IDL.Vec(IDL.Text) })], []),
+  updateAttendanceOTForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
+  updateAttendanceAdvanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
+  regularizeAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
+  flagAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+
+  // ── Regularization ────────────────────────────────────────────────
+  createRegularizationRequest: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+  getRegularizationRequests: IDL.Func([], [IDL.Vec(RegularizationRequest)], ['query']),
+  approveRegularizationRequest: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  rejectRegularizationRequest: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+
+  // ── Advances ─────────────────────────────────────────────────────
   addAdvance: IDL.Func([IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
   getAdvancesByEmployee: IDL.Func([IDL.Text], [IDL.Vec(Advance)], ['query']),
 
+  // ── Audit ────────────────────────────────────────────────────────
   getAuditLogs: IDL.Func([], [IDL.Vec(AuditLog)], ['query']),
 
+  // ── Payroll (legacy) ──────────────────────────────────────────────
   generatePayroll: IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Record({ generatedCount: IDL.Nat })], []),
   overwritePayroll: IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Record({ generatedCount: IDL.Nat })], []),
   getPayrollByMonth: IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(PayrollRecord)], ['query']),
   getPayrollSummary: IDL.Func([IDL.Nat, IDL.Nat], [PayrollSummary], ['query']),
 
+  // ── Tenant Payroll ────────────────────────────────────────────────
+  getPayrollByCompanyAndMonth: IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Vec(TenantPayrollRecord)], ['query']),
+  getAllPayrollByCompany: IDL.Func([IDL.Text], [IDL.Vec(TenantPayrollRecord)], ['query']),
+  savePayrollForCompany: IDL.Func([IDL.Text, IDL.Vec(TenantPayrollRecord)], [IDL.Nat], []),
+  deletePayrollForCompanyAndMonth: IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Nat], []),
+  updatePayrollDeductionForCompany: IDL.Func([
+    IDL.Text, IDL.Text, IDL.Nat, IDL.Nat,
+    IDL.Float64, IDL.Float64, IDL.Float64,
+  ], [IDL.Bool], []),
+
+  // ── Supervisors ───────────────────────────────────────────────────
   getSupervisors: IDL.Func([], [IDL.Vec(Supervisor)], ['query']),
   addSupervisor: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
   removeSupervisor: IDL.Func([IDL.Text], [IDL.Bool], []),
   verifySupervisorPin: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], ['query']),
 });
-
-export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const Trade = IDL.Record({
@@ -222,6 +480,39 @@ export const idlFactory = ({ IDL }) => {
     createdAt: IDL.Int,
   });
 
+  const TenantEmployee = IDL.Record({
+    id: IDL.Text,
+    companyCode: IDL.Text,
+    employeeId: IDL.Text,
+    name: IDL.Text,
+    mobile: IDL.Text,
+    site: IDL.Text,
+    tradeId: IDL.Text,
+    departmentId: IDL.Text,
+    status: IDL.Text,
+    salaryMode: IDL.Text,
+    cityType: IDL.Text,
+    basicSalary: IDL.Float64,
+    hra: IDL.Float64,
+    conveyance: IDL.Float64,
+    specialAllowance: IDL.Float64,
+    otherAllowance: IDL.Float64,
+    otRate: IDL.Float64,
+    pfApplicable: IDL.Bool,
+    esiApplicable: IDL.Bool,
+    aadhaarNumber: IDL.Text,
+    panNumber: IDL.Text,
+    uanNumber: IDL.Text,
+    esiNumber: IDL.Text,
+    bankAccountHolderName: IDL.Text,
+    bankAccountNumber: IDL.Text,
+    ifscCode: IDL.Text,
+    bankName: IDL.Text,
+    branchAddress: IDL.Text,
+    dateOfJoining: IDL.Text,
+    createdAt: IDL.Int,
+  });
+
   const AttendanceRecord = IDL.Record({
     id: IDL.Text,
     employeeId: IDL.Text,
@@ -239,6 +530,56 @@ export const idlFactory = ({ IDL }) => {
     changedBy: IDL.Text,
     updatedAt: IDL.Int,
     createdAt: IDL.Int,
+  });
+
+  const TenantAttendanceRecord = IDL.Record({
+    id: IDL.Text,
+    companyCode: IDL.Text,
+    employeeId: IDL.Text,
+    date: IDL.Text,
+    status: IDL.Text,
+    otHours: IDL.Float64,
+    advanceAmount: IDL.Float64,
+    punchIn: IDL.Text,
+    punchOut: IDL.Text,
+    lat: IDL.Float64,
+    lng: IDL.Float64,
+    isFlagged: IDL.Bool,
+    flagReason: IDL.Text,
+    isRegularized: IDL.Bool,
+    regularizationReason: IDL.Text,
+    changedBy: IDL.Text,
+    updatedAt: IDL.Int,
+    createdAt: IDL.Int,
+  });
+
+  const TenantPayrollRecord = IDL.Record({
+    id: IDL.Text,
+    companyCode: IDL.Text,
+    employeeId: IDL.Text,
+    month: IDL.Nat,
+    year: IDL.Nat,
+    earnedBasic: IDL.Float64,
+    earnedHra: IDL.Float64,
+    earnedConveyance: IDL.Float64,
+    earnedSpecialAllowance: IDL.Float64,
+    earnedOtherAllowance: IDL.Float64,
+    earnedGross: IDL.Float64,
+    otPay: IDL.Float64,
+    finalGross: IDL.Float64,
+    pfDeduction: IDL.Float64,
+    esiDeduction: IDL.Float64,
+    ptDeduction: IDL.Float64,
+    advanceDeduction: IDL.Float64,
+    otherDeduction: IDL.Float64,
+    netPay: IDL.Float64,
+    paidDays: IDL.Float64,
+    presentDays: IDL.Float64,
+    halfDays: IDL.Float64,
+    lopDays: IDL.Float64,
+    totalDaysInMonth: IDL.Nat,
+    otHours: IDL.Float64,
+    generatedAt: IDL.Int,
   });
 
   const PayrollRecord = IDL.Record({
@@ -294,9 +635,127 @@ export const idlFactory = ({ IDL }) => {
     active: IDL.Bool,
   });
 
+  const RegularizationRequest = IDL.Record({
+    id: IDL.Text,
+    employeeId: IDL.Text,
+    date: IDL.Text,
+    oldStatus: IDL.Text,
+    requestedStatus: IDL.Text,
+    reason: IDL.Text,
+    requestedBy: IDL.Text,
+    approvalStatus: IDL.Text,
+    approvedBy: IDL.Text,
+    approvedAt: IDL.Int,
+    createdAt: IDL.Int,
+  });
+
+  const CompanyFull = IDL.Record({
+    id: IDL.Text,
+    companyCode: IDL.Text,
+    companyName: IDL.Text,
+    legalName: IDL.Text,
+    brandName: IDL.Text,
+    address: IDL.Text,
+    state: IDL.Text,
+    country: IDL.Text,
+    status: IDL.Text,
+    adminUsername: IDL.Text,
+    adminPasswordHash: IDL.Text,
+    planStatus: IDL.Text,
+    moduleAccess: IDL.Vec(IDL.Text),
+    logoDataUrl: IDL.Text,
+    notes: IDL.Text,
+    updatedAt: IDL.Int,
+    createdAt: IDL.Int,
+  });
+
+  const CompanySession = IDL.Record({
+    token: IDL.Text,
+    companyId: IDL.Text,
+    companyCode: IDL.Text,
+    companyName: IDL.Text,
+    username: IDL.Text,
+    role: IDL.Text,
+    siteId: IDL.Text,
+    createdAt: IDL.Int,
+    expiresAt: IDL.Int,
+  });
+
+  const SuperAdminSession = IDL.Record({
+    token: IDL.Text,
+    username: IDL.Text,
+    createdAt: IDL.Int,
+    expiresAt: IDL.Int,
+  });
+
+  const LoginResult = IDL.Record({
+    success: IDL.Bool,
+    token: IDL.Text,
+    companyCode: IDL.Text,
+    companyName: IDL.Text,
+    role: IDL.Text,
+    errorMsg: IDL.Text,
+  });
+
+  const SuperAdminLoginResult = IDL.Record({
+    success: IDL.Bool,
+    token: IDL.Text,
+    errorMsg: IDL.Text,
+  });
+
+  const PlatformStats = IDL.Record({
+    totalCompanies: IDL.Nat,
+    activeCompanies: IDL.Nat,
+    suspendedCompanies: IDL.Nat,
+    inactiveCompanies: IDL.Nat,
+    trialCompanies: IDL.Nat,
+    paidCompanies: IDL.Nat,
+    totalEmployees: IDL.Nat,
+    totalUsers: IDL.Nat,
+  });
+
+  const TenantSummary = IDL.Record({
+    employeeCount: IDL.Nat,
+    attendanceCount: IDL.Nat,
+    payrollCount: IDL.Nat,
+    status: IDL.Text,
+    plan: IDL.Text,
+    modules: IDL.Vec(IDL.Text),
+    createdAt: IDL.Int,
+    updatedAt: IDL.Int,
+  });
+
   return IDL.Service({
     isCallerAdmin: IDL.Func([], [IDL.Bool], []),
 
+    // ── Company / Auth ────────────────────────────────────────────────
+    getCompanies: IDL.Func([], [IDL.Vec(CompanyFull)], ['query']),
+    ensureCompaniesBootstrapped: IDL.Func([], [IDL.Nat], []),
+    getCompaniesUpdate: IDL.Func([], [IDL.Vec(CompanyFull)], []),
+    getCompanyByCode: IDL.Func([IDL.Text], [IDL.Opt(CompanyFull)], ['query']),
+    createCompany: IDL.Func([
+      IDL.Text, IDL.Text, IDL.Text, IDL.Text,
+      IDL.Text, IDL.Text, IDL.Text,
+      IDL.Text, IDL.Text, IDL.Text, IDL.Vec(IDL.Text), IDL.Text,
+    ], [IDL.Bool], []),
+    updateCompany: IDL.Func([
+      IDL.Text, IDL.Text, IDL.Text, IDL.Text,
+      IDL.Text, IDL.Text, IDL.Text,
+      IDL.Text, IDL.Text, IDL.Vec(IDL.Text), IDL.Text, IDL.Text,
+    ], [IDL.Bool], []),
+    updateCompanyStatus: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    updateCompanyAdminPassword: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    loginCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [LoginResult], []),
+    validateCompanySession: IDL.Func([IDL.Text], [IDL.Opt(CompanySession)], ['query']),
+    logoutCompanySession: IDL.Func([IDL.Text], [IDL.Bool], []),
+    loginSuperAdmin: IDL.Func([IDL.Text, IDL.Text], [SuperAdminLoginResult], []),
+    validateSuperAdminSession: IDL.Func([IDL.Text], [IDL.Opt(SuperAdminSession)], ['query']),
+    logoutSuperAdminSession: IDL.Func([IDL.Text], [IDL.Bool], []),
+    changeSuperAdminPassword: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    getPlatformStats: IDL.Func([], [PlatformStats], ['query']),
+    getTenantSummary: IDL.Func([IDL.Text], [TenantSummary], ['query']),
+
+    // ── Masters ───────────────────────────────────────────────────────
     getTrades: IDL.Func([], [IDL.Record({ trades: IDL.Vec(Trade), activeTrades: IDL.Vec(Trade) })], ['query']),
     createTrade: IDL.Func([IDL.Text], [IDL.Bool], []),
     updateTrade: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
@@ -309,10 +768,16 @@ export const idlFactory = ({ IDL }) => {
     createSite: IDL.Func([IDL.Text, IDL.Float64, IDL.Float64, IDL.Float64], [IDL.Bool], []),
     updateSite: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Float64], [IDL.Bool], []),
 
+    // ── Employees ─────────────────────────────────────────────────────
     getEmployees: IDL.Func([], [IDL.Record({ allEmployees: IDL.Vec(Employee), activeEmployees: IDL.Vec(Employee) })], ['query']),
     createEmployee: IDL.Func([Employee], [IDL.Bool], []),
     updateEmployee: IDL.Func([IDL.Text, Employee], [IDL.Bool], []),
 
+    getEmployeesByCompany: IDL.Func([IDL.Text], [IDL.Record({ allEmployees: IDL.Vec(TenantEmployee), activeEmployees: IDL.Vec(TenantEmployee) })], ['query']),
+    createEmployeeForCompany: IDL.Func([IDL.Text, TenantEmployee], [IDL.Bool], []),
+    updateEmployeeForCompany: IDL.Func([IDL.Text, IDL.Text, TenantEmployee], [IDL.Bool], []),
+
+    // ── Attendance ────────────────────────────────────────────────────
     markAttendance: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text], [IDL.Bool], []),
     updateAttendanceOT: IDL.Func([IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
     bulkMarkAttendance: IDL.Func(
@@ -325,16 +790,68 @@ export const idlFactory = ({ IDL }) => {
     regularizeAttendance: IDL.Func([IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
     flagAttendance: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
 
+    getAllAttendanceByCompany: IDL.Func([IDL.Text], [IDL.Vec(TenantAttendanceRecord)], ['query']),
+    getAttendanceByCompanyAndMonth: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Vec(TenantAttendanceRecord)], ['query']),
+    markAttendanceForCompany: IDL.Func([
+      IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64,
+      IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text,
+    ], [IDL.Bool], []),
+    markAttendanceOverwriteForCompany: IDL.Func([
+      IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64,
+      IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Text,
+    ], [IDL.Bool], []),
+    deleteAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+    bulkMarkAttendanceForCompany: IDL.Func([
+      IDL.Text,
+      IDL.Vec(IDL.Record({
+        employeeId: IDL.Text, date: IDL.Text, status: IDL.Text,
+        otHours: IDL.Float64, advanceAmount: IDL.Float64,
+      })),
+      IDL.Text,
+    ], [IDL.Record({ successCount: IDL.Nat, skippedCount: IDL.Nat, errors: IDL.Vec(IDL.Text) })], []),
+    bulkMarkAttendanceOverwriteForCompany: IDL.Func([
+      IDL.Text,
+      IDL.Vec(IDL.Record({
+        employeeId: IDL.Text, date: IDL.Text, status: IDL.Text,
+        otHours: IDL.Float64, advanceAmount: IDL.Float64,
+      })),
+      IDL.Text,
+    ], [IDL.Record({ successCount: IDL.Nat, skippedCount: IDL.Nat, errors: IDL.Vec(IDL.Text) })], []),
+    updateAttendanceOTForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
+    updateAttendanceAdvanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text], [IDL.Bool], []),
+    regularizeAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
+    flagAttendanceForCompany: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+
+    // ── Regularization ────────────────────────────────────────────────
+    createRegularizationRequest: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+    getRegularizationRequests: IDL.Func([], [IDL.Vec(RegularizationRequest)], ['query']),
+    approveRegularizationRequest: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    rejectRegularizationRequest: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+
+    // ── Advances ─────────────────────────────────────────────────────
     addAdvance: IDL.Func([IDL.Text, IDL.Float64, IDL.Text, IDL.Text], [IDL.Bool], []),
     getAdvancesByEmployee: IDL.Func([IDL.Text], [IDL.Vec(Advance)], ['query']),
 
+    // ── Audit ────────────────────────────────────────────────────────
     getAuditLogs: IDL.Func([], [IDL.Vec(AuditLog)], ['query']),
 
+    // ── Payroll (legacy) ──────────────────────────────────────────────
     generatePayroll: IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Record({ generatedCount: IDL.Nat })], []),
     overwritePayroll: IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Record({ generatedCount: IDL.Nat })], []),
     getPayrollByMonth: IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(PayrollRecord)], ['query']),
     getPayrollSummary: IDL.Func([IDL.Nat, IDL.Nat], [PayrollSummary], ['query']),
 
+    // ── Tenant Payroll ────────────────────────────────────────────────
+    getPayrollByCompanyAndMonth: IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Vec(TenantPayrollRecord)], ['query']),
+    getAllPayrollByCompany: IDL.Func([IDL.Text], [IDL.Vec(TenantPayrollRecord)], ['query']),
+    savePayrollForCompany: IDL.Func([IDL.Text, IDL.Vec(TenantPayrollRecord)], [IDL.Nat], []),
+    deletePayrollForCompanyAndMonth: IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Nat], []),
+    updatePayrollDeductionForCompany: IDL.Func([
+      IDL.Text, IDL.Text, IDL.Nat, IDL.Nat,
+      IDL.Float64, IDL.Float64, IDL.Float64,
+    ], [IDL.Bool], []),
+
+    // ── Supervisors ───────────────────────────────────────────────────
     getSupervisors: IDL.Func([], [IDL.Vec(Supervisor)], ['query']),
     addSupervisor: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
     removeSupervisor: IDL.Func([IDL.Text], [IDL.Bool], []),

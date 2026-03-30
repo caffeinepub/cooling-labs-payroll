@@ -314,11 +314,11 @@ persistent actor {
             logoDataUrl = c.logoDataUrl; notes = ""; updatedAt = Time.now();
             createdAt = c.createdAt }
         });
-      } else {
-        bootstrapDefaultCompaniesFull();
       };
       fullCompaniesBootstrapped := true;
     };
+    // Always ensure COOLABS and DEMOCORP exist (idempotent)
+    bootstrapDefaultCompaniesFull();
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -425,6 +425,22 @@ persistent actor {
     // Bootstrap guard: if empty, companies have not been seeded
     if (companiesFull.size() == 0) {
       return []  // Will be seeded on next postupgrade or loginCompany call
+    };
+    companiesFull
+  };
+
+  public func ensureCompaniesBootstrapped() : async Nat {
+    if (companiesFull.size() == 0) {
+      bootstrapDefaultCompaniesFull();
+      fullCompaniesBootstrapped := true;
+    };
+    companiesFull.size()
+  };
+
+  public func getCompaniesUpdate() : async [CompanyFull] {
+    if (companiesFull.size() == 0) {
+      bootstrapDefaultCompaniesFull();
+      fullCompaniesBootstrapped := true;
     };
     companiesFull
   };

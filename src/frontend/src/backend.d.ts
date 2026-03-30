@@ -310,6 +310,8 @@ export interface backendInterface {
   // Company management
   getCompanies: () => Promise<Company[]>;
   getCompanyByCode: (code: string) => Promise<[] | [Company]>;
+  ensureCompaniesBootstrapped: () => Promise<bigint>;
+  getCompaniesUpdate: () => Promise<Company[]>;
   createCompany: (
     companyCode: string, companyName: string, legalName: string, brandName: string,
     address: string, state: string, country: string,

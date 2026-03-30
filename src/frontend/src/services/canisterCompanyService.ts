@@ -39,14 +39,36 @@ function mapCanisterCompany(c: Record<string, unknown>): Company {
   };
 }
 
-/** Fetch all companies from canister. Returns [] on error. */
+/** Fetch all companies from canister. Uses update call to auto-bootstrap if empty. */
 export async function canisterGetCompanies(): Promise<Company[]> {
+  // First try update call — this auto-bootstraps canister if companiesFull is empty
   try {
-    const raw = (await backendService.getCompanies()) as unknown[];
-    return (raw as Record<string, unknown>[]).map(mapCanisterCompany);
+    const raw = (await backendService.getCompaniesUpdate()) as unknown[];
+    const result = (raw as Record<string, unknown>[]).map(mapCanisterCompany);
+    console.log(
+      "[canisterCompanyService] getCompaniesUpdate succeeded, count:",
+      result.length,
+    );
+    return result;
   } catch (e) {
-    console.error("[canisterCompanyService] getCompanies failed", e);
-    return [];
+    console.error("[canisterCompanyService] getCompaniesUpdate failed:", e);
+  }
+  // Fallback: query (won't bootstrap, but may return existing data)
+  try {
+    const raw2 = (await backendService.getCompanies()) as unknown[];
+    const result2 = (raw2 as Record<string, unknown>[]).map(mapCanisterCompany);
+    console.log(
+      "[canisterCompanyService] getCompanies query result, count:",
+      result2.length,
+    );
+    return result2;
+  } catch (e2) {
+    console.error(
+      "[canisterCompanyService] getCompanies query also failed:",
+      e2,
+    );
+    // Throw so callers can show an explicit error instead of silently showing 0
+    throw new Error("Backend canister is unreachable. Please try again.");
   }
 }
 
@@ -225,22 +247,40 @@ export async function canisterCreateCompany(
 }
 
 /**
- * Push local companies to canister if canister is empty (one-time migration).
+ * TRUE MERGE: push any locally-created companies that don't yet exist in canister.
+ * Skips COOLABS and DEMOCORP (bootstrapped by canister). Does NOT skip if canister has data.
  */
 export async function migrateLocalCompaniesToCanister(
   localCompanies: Company[],
 ): Promise<void> {
+  if (!localCompanies || localCompanies.length === 0) return;
   try {
+    // Ensure canister is bootstrapped first
+    await backendService.ensureCompaniesBootstrapped();
     const existing = await canisterGetCompanies();
-    if (existing.length > 0) return; // canister already has data
-    for (const c of localCompanies) {
-      await canisterCreateCompany(c);
-    }
-    console.log(
-      "[canisterCompanyService] migrated",
-      localCompanies.length,
-      "companies to canister",
+    const existingCodes = new Set(
+      existing.map((c) => c.companyCode.toUpperCase()),
     );
+
+    let migrated = 0;
+    for (const c of localCompanies) {
+      const code = c.companyCode.toUpperCase();
+      // Skip system defaults — already bootstrapped by canister
+      if (code === "COOLABS" || code === "DEMOCORP") continue;
+      // Only migrate companies that don't already exist in canister
+      if (!existingCodes.has(code)) {
+        await canisterCreateCompany(c);
+        migrated++;
+        console.log(
+          `[canisterCompanyService] migrated company to canister: ${code}`,
+        );
+      }
+    }
+    if (migrated > 0) {
+      console.log(
+        `[canisterCompanyService] merged ${migrated} new companies to canister`,
+      );
+    }
   } catch (e) {
     console.error("[canisterCompanyService] migration failed", e);
   }
