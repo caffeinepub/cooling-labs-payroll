@@ -15,6 +15,7 @@ import { Checkbox } from "../../components/ui/checkbox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
+import { canisterCreateCompany } from "../../services/canisterCompanyService";
 import {
   ALL_MODULES,
   MODULE_LABELS,
@@ -137,13 +138,13 @@ export function CompanyOnboardingWizard({
     }));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const errs = validateStep(3);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setCreating(true);
     try {
-      createCompany({
+      const companyData = {
         companyCode: form.companyCode.toUpperCase(),
         companyName: form.companyName,
         legalName: form.legalName,
@@ -153,11 +154,13 @@ export function CompanyOnboardingWizard({
         state: form.state,
         country: form.country || "India",
         moduleAccess: form.moduleAccess,
-        status: "active",
+        status: "active" as const,
         adminUsername: form.adminUsername,
         adminPassword: form.adminPassword,
         planStatus: form.planStatus,
-      });
+      };
+      createCompany(companyData);
+      await canisterCreateCompany(companyData);
       toast.success(`Company ${form.companyCode} created successfully`);
       onCreated();
     } catch (_e) {

@@ -3,13 +3,11 @@
  *
  * Tenant-aware payroll backed by ICP canister.
  * Strategy:
- *   - Writes: canister (primary) + localStorage (cache)
- *   - Reads:  localStorage (fast, sync) — already synced from canister on login
- *   - Sync:   syncPayrollFromCanister() fetches all company payroll and seeds localStorage
+ *   - Reads: canister (source of truth), seeded into localStorage as cache.
+ *   - Writes: canister first, then localStorage cache updated.
+ *   - Migration: if canister is empty and localStorage has data, push all to canister.
  *
- * Payroll calculation uses the shared engine in payrollStorage.ts (correct formula:
- *   Earned = Monthly × PaidDays / TotalDaysInMonth)
- * Attendance data is read from localStorage (already synced from canister).
+ * Uses getAllPayrollByCompany for efficient single-call sync.
  */
 
 import type { TenantPayrollRecord } from "../backend.d";
@@ -74,7 +72,6 @@ function toLocalStorageRecord(p: TenantPayrollRecord): object {
     employeeId: p.employeeId,
     month: p.month,
     year: p.year,
-    // In localStorage, basicSalary = earnedBasic, hra = earnedHra, etc.
     basicSalary: p.earnedBasic,
     hra: p.earnedHra,
     conveyance: p.earnedConveyance,
@@ -89,7 +86,6 @@ function toLocalStorageRecord(p: TenantPayrollRecord): object {
     otherDeduction: p.otherDeduction,
     netPay: p.netPay,
     generatedAt: p.generatedAt,
-    // Extended breakdown fields
     _presentDays: p.presentDays,
     _halfDays: p.halfDays,
     _lopDays: p.lopDays,
@@ -108,7 +104,9 @@ function toLocalStorageRecord(p: TenantPayrollRecord): object {
 }
 
 /**
- * Sync all payroll records for the active company from canister into localStorage.
+ * Sync ALL payroll records for the active company from canister into localStorage.
+ * Uses getAllPayrollByCompany for a single efficient call.
+ * If canister is empty and localStorage has payroll data, migrates to canister.
  * Called on login / page load.
  */
 export async function syncPayrollFromCanister(): Promise<{
@@ -117,40 +115,76 @@ export async function syncPayrollFromCanister(): Promise<{
 }> {
   const companyCode = getActiveCompanyId();
   try {
-    // We fetch all months by getting records from canister
-    // Unfortunately canister API is per-month; we do a broad fetch by loading
-    // all records using a dedicated query if available.
-    // For now we use a workaround: read all tenantPayroll records for this company
-    // We'll add a getAllPayrollByCompany call to the canister.
-    // For current implementation, we use the existing getPayrollByCompanyAndMonth
-    // for the current month and previous 2 months to populate the cache.
-    const now = new Date();
-    const months: [number, number][] = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push([d.getMonth() + 1, d.getFullYear()]);
-    }
-
-    const allRecords: TenantPayrollRecord[] = [];
-    for (const [m, y] of months) {
-      try {
-        const recs = (await backendService.getPayrollByCompanyAndMonth(
-          companyCode,
-          m,
-          y,
-        )) as TenantPayrollRecord[];
-        allRecords.push(...recs);
-      } catch {
-        // ignore per-month errors
-      }
-    }
+    // Single call to get ALL payroll for this company (no month-by-month loop)
+    const allRecords = (await backendService.getAllPayrollByCompany(
+      companyCode,
+    )) as TenantPayrollRecord[];
 
     if (allRecords.length > 0) {
-      seedLocalStorage(companyCode, allRecords);
+      seedLocalStorageAll(companyCode, allRecords);
       console.log(
         `[CanisterPayroll] Synced ${allRecords.length} records from canister for ${companyCode}`,
       );
       return { count: allRecords.length, source: "canister" };
+    }
+
+    // Canister is empty — attempt migration from localStorage
+    const key = payrollLSKey();
+    let localRecords: any[] = [];
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) localRecords = JSON.parse(raw);
+    } catch {}
+
+    if (localRecords.length > 0) {
+      console.log(
+        `[CanisterPayroll] Migrating ${localRecords.length} payroll records from localStorage to canister for ${companyCode}...`,
+      );
+      // Convert localStorage records to TenantPayrollRecord format
+      const tenantRecords: TenantPayrollRecord[] = localRecords.map(
+        (r: any) => ({
+          id: String(r.id ?? ""),
+          companyCode,
+          employeeId: String(r.employeeId ?? ""),
+          month: Number(r.month ?? 0),
+          year: Number(r.year ?? 0),
+          earnedBasic: Number(r._earnedBasic ?? r.basicSalary ?? 0),
+          earnedHra: Number(r._earnedHra ?? r.hra ?? 0),
+          earnedConveyance: Number(r._earnedConveyance ?? r.conveyance ?? 0),
+          earnedSpecialAllowance: Number(
+            r._earnedSpecialAllowance ?? r.specialAllowance ?? 0,
+          ),
+          earnedOtherAllowance: Number(
+            r._earnedOtherAllowance ?? r.otherAllowance ?? 0,
+          ),
+          earnedGross: Number(r._earnedGross ?? r.grossPay ?? 0),
+          otPay: Number(r._otPay ?? r.otAmount ?? 0),
+          finalGross: Number(r._finalGross ?? r.grossPay ?? 0),
+          pfDeduction: Number(r.pfDeduction ?? 0),
+          esiDeduction: Number(r.esiDeduction ?? 0),
+          ptDeduction: Number(r.ptDeduction ?? 0),
+          advanceDeduction: Number(r.advanceDeduction ?? 0),
+          otherDeduction: Number(r.otherDeduction ?? 0),
+          netPay: Number(r.netPay ?? 0),
+          paidDays: Number(r._paidDays ?? 0),
+          presentDays: Number(r._presentDays ?? 0),
+          halfDays: Number(r._halfDays ?? 0),
+          lopDays: Number(r._lopDays ?? 0),
+          totalDaysInMonth: Number(r._totalDaysInMonth ?? 30),
+          otHours: Number(r._otHours ?? 0),
+          generatedAt: Number(r.generatedAt ?? 0),
+        }),
+      );
+
+      try {
+        await backendService.savePayrollForCompany(companyCode, tenantRecords);
+        console.log(
+          `[CanisterPayroll] Migrated ${tenantRecords.length} records to canister`,
+        );
+        return { count: tenantRecords.length, source: "canister" };
+      } catch (e) {
+        console.warn("[CanisterPayroll] Migration to canister failed:", e);
+      }
     }
 
     return { count: 0, source: "canister" };
@@ -161,31 +195,18 @@ export async function syncPayrollFromCanister(): Promise<{
 }
 
 /**
- * Overwrite localStorage payroll cache with canister records.
+ * Overwrite localStorage payroll cache entirely with canister records.
  */
-function seedLocalStorage(
-  _companyCode: string,
+function seedLocalStorageAll(
+  companyCode: string,
   records: TenantPayrollRecord[],
 ): void {
-  const key = payrollLSKey();
+  const key = getTenantKey(companyCode, "clf_payroll");
   try {
-    // Read existing localStorage to preserve months not fetched
-    let existing: any[] = [];
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) existing = JSON.parse(raw);
-    } catch {}
-
-    // Build set of month+year pairs from canister records
-    const canisterMonths = new Set(records.map((r) => `${r.month}-${r.year}`));
-
-    // Keep existing records for months NOT covered by canister sync
-    const preserved = existing.filter(
-      (r: any) => !canisterMonths.has(`${r.month}-${r.year}`),
+    localStorage.setItem(
+      key,
+      JSON.stringify(records.map(toLocalStorageRecord)),
     );
-
-    const merged = [...preserved, ...records.map(toLocalStorageRecord)];
-    localStorage.setItem(key, JSON.stringify(merged));
     window.dispatchEvent(new CustomEvent("clf:payroll-updated"));
   } catch (e) {
     console.warn("[CanisterPayroll] Failed to seed localStorage:", e);
@@ -195,20 +216,14 @@ function seedLocalStorage(
 /**
  * Generate payroll for a month using local computation engine,
  * then save all generated records to canister.
- * Skips employees that already have payroll for this month.
  */
 export async function generateAndSavePayroll(
   month: number,
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
-
-  // Run local computation (reads from localStorage attendance + employees)
   const result = generatePayroll(BigInt(month), BigInt(year), "admin");
-
-  // Read the freshly computed records from localStorage
   await pushMonthToCanister(companyCode, month, year);
-
   return { generatedCount: Number(result.generatedCount) };
 }
 
@@ -220,8 +235,6 @@ export async function overwriteAndSavePayroll(
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
-
-  // Delete this month from canister first
   try {
     await backendService.deletePayrollForCompanyAndMonth(
       companyCode,
@@ -231,19 +244,13 @@ export async function overwriteAndSavePayroll(
   } catch (e) {
     console.warn("[CanisterPayroll] Delete before overwrite failed:", e);
   }
-
-  // Run local overwrite computation
   const result = overwritePayroll(BigInt(month), BigInt(year), "admin");
-
-  // Push fresh records to canister
   await pushMonthToCanister(companyCode, month, year);
-
   return { generatedCount: Number(result.generatedCount) };
 }
 
 /**
- * Read payroll records for a month from localStorage (already synced),
- * convert to TenantPayrollRecord format, and save to canister.
+ * Read payroll records for a month from localStorage, convert, and save to canister.
  */
 async function pushMonthToCanister(
   companyCode: string,
@@ -265,10 +272,6 @@ async function pushMonthToCanister(
   }
 }
 
-/**
- * Save a manual deduction update (advance/PT/other) to canister.
- * Call after payrollStorage.setAdvanceDeduction / setPayrollPT / setOtherDeduction.
- */
 export async function saveDeductionToCanister(
   employeeId: string,
   month: number,
@@ -293,7 +296,6 @@ export async function saveDeductionToCanister(
   }
 }
 
-/** Re-export wrappers that also sync to canister */
 export async function setAdvanceAndSync(
   empId: string,
   month: bigint,
@@ -301,7 +303,6 @@ export async function setAdvanceAndSync(
   advance: number,
 ): Promise<boolean> {
   const ok = setAdvanceDeduction(empId, month, year, advance);
-  // Read current PT and other to preserve them
   const bds = getPayrollWithBreakdown(month, year);
   const bd = bds.find((b) => b.record.employeeId === empId);
   await saveDeductionToCanister(
@@ -391,7 +392,6 @@ export async function manualOverrideAndSync(
     netPay,
     updatedBy,
   );
-  // Push updated record to canister
   const companyCode = getActiveCompanyId();
   await pushMonthToCanister(companyCode, Number(month), Number(year));
   return ok;

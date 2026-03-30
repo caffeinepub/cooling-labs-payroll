@@ -1,10 +1,10 @@
-import React, {
+import type React from "react";
+import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
-  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { syncAttendanceFromCanister } from "../services/canisterAttendanceService";
 import { loadEmployeesFromCanister } from "../services/canisterEmployeeService";
@@ -56,7 +56,9 @@ const AppContext = createContext<AppContextType>({
   refreshSupervisors: async () => {},
 });
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppContextProvider({
+  children,
+}: { children: React.ReactNode }) {
   const { adminLoggedIn } = useAdminAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [activeEmployees, setActiveEmployees] = useState<Employee[]>([]);
@@ -87,13 +89,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAttendanceSynced(false);
       const result = await syncAttendanceFromCanister();
       setAttendanceSynced(true);
-      void syncPayrollFromCanister();
+      // Also sync payroll — await it so data is ready before loading=false
+      await syncPayrollFromCanister();
       console.log(
         `[AppContext] Attendance synced: ${result.count} records from ${result.source}`,
       );
     } catch (e) {
       console.warn("[AppContext] Attendance sync failed:", e);
-      setAttendanceSynced(true); // Don't block UI
+      setAttendanceSynced(true);
     }
   }, []);
 
@@ -122,17 +125,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!adminLoggedIn) {
       setAttendanceSynced(false);
+      setEmployees([]);
+      setActiveEmployees([]);
       return;
     }
+
     setLoading(true);
+    // Load masters from localStorage (no canister backing yet)
     refreshTrades();
     refreshDepartments();
     refreshSites();
-    void refreshEmployees();
     void refreshSupervisors();
-    // Sync attendance from canister — seeds localStorage so all pages have fresh data
-    void refreshAttendance();
-    setLoading(false);
+
+    // Sequentially await canister calls so data is populated BEFORE loading=false
+    const initialize = async () => {
+      try {
+        await refreshEmployees();
+        await refreshAttendance(); // also awaits payroll sync internally
+      } catch (e) {
+        console.warn("[AppContext] Initialization error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void initialize();
   }, [
     adminLoggedIn,
     refreshEmployees,
@@ -174,3 +190,5 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export function useAppContext() {
   return useContext(AppContext);
 }
+
+export const AppProvider = AppContextProvider;

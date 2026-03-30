@@ -16,6 +16,8 @@ export interface Company {
   adminPassword: string;
   createdAt: number;
   planStatus: "trial" | "active" | "inactive";
+  notes?: string;
+  updatedAt?: number;
 }
 
 export const ALL_MODULES = [

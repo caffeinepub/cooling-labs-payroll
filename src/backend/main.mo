@@ -8,14 +8,14 @@ import Time "mo:base/Time";
 
 persistent actor {
 
-  // ── V1 Types (migration from very first schema) ───────────────────────────────
+  // ── V1 Types (migration from very first schema) ────────────────────────────────────────
 
   type SiteV1 = { id : Text; name : Text; status : Text; createdAt : Int };
   type EmployeeV1 = { id : Text; employeeId : Text; name : Text; mobile : Text; site : Text; tradeId : Text; departmentId : Text; status : Text; basicSalary : Float; otRate : Float; pfApplicable : Bool; esiApplicable : Bool; createdAt : Int };
   type AttendanceRecordV1 = { id : Text; employeeId : Text; date : Text; status : Text; otHours : Float; isRegularized : Bool; regularizationReason : Text; changedBy : Text; updatedAt : Int; createdAt : Int };
   type SupervisorV1 = { phone : Text; name : Text; siteId : Text; active : Bool };
 
-  // ── V2 Types (previous stable schema — used only for migration) ─────────────────
+  // ── V2 Types (previous stable schema — used only for migration) ──────────────────────────
 
   type PayrollRecordV2 = {
     id : Text; employeeId : Text; month : Nat; year : Nat;
@@ -28,7 +28,7 @@ persistent actor {
 
   type PayrollRecordV1 = { id : Text; employeeId : Text; month : Nat; year : Nat; basicSalary : Float; otAmount : Float; grossPay : Float; pfDeduction : Float; esiDeduction : Float; netPay : Float; generatedAt : Int };
 
-  // ── Current Types ─────────────────────────────────────────────────────
+  // ── Current Types ─────────────────────────────────────────────────────────
 
   type Trade = { id : Text; name : Text; status : Text; createdAt : Int };
   type Department = { id : Text; name : Text; status : Text; createdAt : Int };
@@ -40,7 +40,6 @@ persistent actor {
 
   type AttendanceRecord = { id : Text; employeeId : Text; date : Text; status : Text; otHours : Float; punchIn : Text; punchOut : Text; lat : Float; lng : Float; isFlagged : Bool; flagReason : Text; isRegularized : Bool; regularizationReason : Text; changedBy : Text; updatedAt : Int; createdAt : Int };
 
-  // Tenant-aware attendance with advanceAmount
   type TenantAttendanceRecord = {
     id : Text;
     companyCode : Text;
@@ -112,8 +111,9 @@ persistent actor {
 
   type RegularizationRequest = { id : Text; employeeId : Text; date : Text; oldStatus : Text; requestedStatus : Text; reason : Text; requestedBy : Text; approvalStatus : Text; approvedBy : Text; approvedAt : Int; createdAt : Int };
 
-  // ── Company / Auth Types ──────────────────────────────────────────────
+  // ── Company / Auth Types ──────────────────────────────────────────
 
+  // Legacy Company type (kept for migration only)
   type Company = {
     id : Text;
     companyCode : Text;
@@ -129,6 +129,27 @@ persistent actor {
     planStatus : Text;
     moduleAccess : [Text];
     logoDataUrl : Text;
+    createdAt : Int;
+  };
+
+  // Full Company type with extra metadata fields
+  type CompanyFull = {
+    id : Text;
+    companyCode : Text;
+    companyName : Text;
+    legalName : Text;
+    brandName : Text;
+    address : Text;
+    state : Text;
+    country : Text;
+    status : Text;
+    adminUsername : Text;
+    adminPasswordHash : Text;
+    planStatus : Text;
+    moduleAccess : [Text];
+    logoDataUrl : Text;
+    notes : Text;
+    updatedAt : Int;
     createdAt : Int;
   };
 
@@ -166,7 +187,29 @@ persistent actor {
     errorMsg : Text;
   };
 
-  // ── Stable vars — V1 ────────────────────────────────────────────────────
+  type TenantSummary = {
+    employeeCount : Nat;
+    attendanceCount : Nat;
+    payrollCount : Nat;
+    status : Text;
+    plan : Text;
+    modules : [Text];
+    createdAt : Int;
+    updatedAt : Int;
+  };
+
+  type PlatformStats = {
+    totalCompanies : Nat;
+    activeCompanies : Nat;
+    suspendedCompanies : Nat;
+    inactiveCompanies : Nat;
+    trialCompanies : Nat;
+    paidCompanies : Nat;
+    totalEmployees : Nat;
+    totalUsers : Nat;
+  };
+
+  // ── Stable vars — V1 ─────────────────────────────────────────────────────────
 
   stable var sites : [SiteV1] = [];
   stable var employees : [EmployeeV1] = [];
@@ -174,7 +217,7 @@ persistent actor {
   stable var payroll : [PayrollRecordV1] = [];
   stable var supervisors : [SupervisorV1] = [];
 
-  // ── Stable vars — V2 ───────────────────────────────────────────────────
+  // ── Stable vars — V2 ───────────────────────────────────────────────────────
 
   stable var trades : [Trade] = [];
   stable var departments : [Department] = [];
@@ -190,13 +233,14 @@ persistent actor {
   stable var counter : Nat = 0;
   stable var migrated : Bool = false;
 
-  // ── V3 stable var ────────────────────────────────────────────────────
+  // ── V3 stable var ───────────────────────────────────────────────────────────────
 
   stable var payrollV3 : [PayrollRecord] = [];
   stable var migratedPayrollV3 : Bool = false;
 
-  // ── Company / Auth stable vars ────────────────────────────────────────
+  // ── Company / Auth stable vars ──────────────────────────────────────────
 
+  // Legacy company array (kept for migration — read-only after migration)
   stable var companies : [Company] = [];
   stable var companySessions : [CompanySession] = [];
   stable var superAdminSessions : [SuperAdminSession] = [];
@@ -204,13 +248,16 @@ persistent actor {
   stable var companiesBootstrapped : Bool = false;
   stable var tenantEmployees : [TenantEmployee] = [];
 
-  // ── Tenant Attendance stable var ──────────────────────────────────────
+  // V2 Company full — all new reads/writes use this
+  stable var companiesFull : [CompanyFull] = [];
+  stable var fullCompaniesBootstrapped : Bool = false;
+
+  // ── Tenant Attendance stable var ──────────────────────────────────────────
 
   stable var tenantAttendance : [TenantAttendanceRecord] = [];
-
   stable var tenantPayroll : [TenantPayrollRecord] = [];
 
-  // ── Migration ───────────────────────────────────────────────────────────
+  // ── Migration ───────────────────────────────────────────────────────────────────
 
   system func postupgrade() {
     if (not migrated) {
@@ -250,17 +297,40 @@ persistent actor {
       };
       migratedPayrollV3 := true;
     };
+    // Legacy company bootstrap (kept for backward compat)
     if (not companiesBootstrapped) {
-      bootstrapDefaultCompanies();
       companiesBootstrapped := true;
+    };
+    // Migrate to CompanyFull — runs once per deployment if companiesFull is empty
+    if (not fullCompaniesBootstrapped) {
+      if (companies.size() > 0) {
+        // Migrate legacy Company records to CompanyFull
+        companiesFull := Array.map(companies, func(c : Company) : CompanyFull {
+          { id = c.id; companyCode = c.companyCode; companyName = c.companyName;
+            legalName = c.legalName; brandName = c.brandName; address = c.address;
+            state = c.state; country = c.country; status = c.status;
+            adminUsername = c.adminUsername; adminPasswordHash = c.adminPasswordHash;
+            planStatus = c.planStatus; moduleAccess = c.moduleAccess;
+            logoDataUrl = c.logoDataUrl; notes = ""; updatedAt = Time.now();
+            createdAt = c.createdAt }
+        });
+      } else {
+        bootstrapDefaultCompaniesFull();
+      };
+      fullCompaniesBootstrapped := true;
     };
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   func nextId() : Text { counter += 1; Nat.toText(counter) # "-" # Int.toText(Time.now()) };
   func charToLower(c : Char) : Char { if (c >= 'A' and c <= 'Z') Char.fromNat32(Char.toNat32(c) + 32) else c };
   func toLower(t : Text) : Text { Text.map(t, charToLower) };
+  func toUpper(t : Text) : Text {
+    Text.map(t, func(c : Char) : Char {
+      if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
+    })
+  };
 
   func daysInMonth(year : Nat, month : Nat) : Nat {
     if (month == 2) {
@@ -282,14 +352,15 @@ persistent actor {
     Time.now() < expiresAt;
   };
 
-  // ── Company Bootstrap ─────────────────────────────────────────────────
+  // ── Company Bootstrap (Full) ─────────────────────────────────────────────
 
-  func bootstrapDefaultCompanies() {
-    let hasCoolabs = Array.find(companies, func(c : Company) : Bool { c.companyCode == "COOLABS" }) != null;
-    let hasDemocorp = Array.find(companies, func(c : Company) : Bool { c.companyCode == "DEMOCORP" }) != null;
+  func bootstrapDefaultCompaniesFull() {
+    let hasCoolabs = Array.find(companiesFull, func(c : CompanyFull) : Bool { c.companyCode == "COOLABS" }) != null;
+    let hasDemocorp = Array.find(companiesFull, func(c : CompanyFull) : Bool { c.companyCode == "DEMOCORP" }) != null;
+    let now = Time.now();
 
     if (not hasCoolabs) {
-      companies := Array.append(companies, [{
+      companiesFull := Array.append(companiesFull, [{
         id = "company-coolabs";
         companyCode = "COOLABS";
         companyName = "Cooling Labs";
@@ -304,12 +375,14 @@ persistent actor {
         planStatus = "active";
         moduleAccess = ["employees","attendance","bulkAttendance","whatsappAttendance","attendanceImport","regularization","payroll","reports","masters","userManagement","salarySlips"];
         logoDataUrl = "";
-        createdAt = Time.now();
+        notes = "";
+        updatedAt = now;
+        createdAt = now;
       }]);
     };
 
     if (not hasDemocorp) {
-      companies := Array.append(companies, [{
+      companiesFull := Array.append(companiesFull, [{
         id = "company-democorp";
         companyCode = "DEMOCORP";
         companyName = "Demo Corporation";
@@ -324,12 +397,19 @@ persistent actor {
         planStatus = "trial";
         moduleAccess = ["employees","attendance","bulkAttendance","whatsappAttendance","attendanceImport","regularization","payroll","reports","masters","userManagement","salarySlips"];
         logoDataUrl = "";
-        createdAt = Time.now();
+        notes = "Demo company for testing";
+        updatedAt = now;
+        createdAt = now;
       }]);
     };
   };
 
-  // ── Admin (legacy) ────────────────────────────────────────────────────
+  // Keep legacy bootstrap for backward compat
+  func bootstrapDefaultCompanies() {
+    bootstrapDefaultCompaniesFull();
+  };
+
+  // ── Admin (legacy) ────────────────────────────────────────────────────────────
 
   public func isCallerAdmin() : async Bool { true };
   public query func verifyAdminPassword(password : Text) : async Bool { password == adminPasswordHash };
@@ -339,14 +419,20 @@ persistent actor {
     true;
   };
 
-  // ── Company Management ─────────────────────────────────────────────────
+  // ── Company Management ────────────────────────────────────────────────────
 
-  public query func getCompanies() : async [Company] { companies };
+  public query func getCompanies() : async [CompanyFull] {
+    // Bootstrap guard: if empty, companies have not been seeded
+    if (companiesFull.size() == 0) {
+      return []  // Will be seeded on next postupgrade or loginCompany call
+    };
+    companiesFull
+  };
 
-  public query func getCompanyByCode(code : Text) : async ?Company {
-    Array.find(companies, func(c : Company) : Bool {
+  public query func getCompanyByCode(code : Text) : async ?CompanyFull {
+    Array.find(companiesFull, func(c : CompanyFull) : Bool {
       toLower(c.companyCode) == toLower(code)
-    });
+    })
   };
 
   public func createCompany(
@@ -355,13 +441,12 @@ persistent actor {
     adminUsername : Text, adminPassword : Text, planStatus : Text,
     moduleAccess : [Text], logoDataUrl : Text
   ) : async { success : Bool; errorMsg : Text } {
-    let upper = Text.map(companyCode, func(c : Char) : Char {
-      if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
-    });
-    if (Array.find(companies, func(c : Company) : Bool { c.companyCode == upper }) != null) {
+    let upper = toUpper(companyCode);
+    if (Array.find(companiesFull, func(c : CompanyFull) : Bool { c.companyCode == upper }) != null) {
       return { success = false; errorMsg = "Company code already exists" };
     };
-    companies := Array.append(companies, [{
+    let now = Time.now();
+    companiesFull := Array.append(companiesFull, [{
       id = "company-" # nextId();
       companyCode = upper;
       companyName = companyName;
@@ -376,7 +461,9 @@ persistent actor {
       planStatus = planStatus;
       moduleAccess = if (moduleAccess.size() == 0) ["employees","attendance","payroll","reports","masters","userManagement"] else moduleAccess;
       logoDataUrl = logoDataUrl;
-      createdAt = Time.now();
+      notes = "";
+      updatedAt = now;
+      createdAt = now;
     }]);
     { success = true; errorMsg = "" };
   };
@@ -384,10 +471,10 @@ persistent actor {
   public func updateCompany(
     id : Text, companyName : Text, legalName : Text, brandName : Text,
     address : Text, state : Text, country : Text,
-    adminUsername : Text, planStatus : Text, moduleAccess : [Text], logoDataUrl : Text
+    adminUsername : Text, planStatus : Text, moduleAccess : [Text], logoDataUrl : Text, notes : Text
   ) : async Bool {
     var found = false;
-    companies := Array.map(companies, func(c : Company) : Company {
+    companiesFull := Array.map(companiesFull, func(c : CompanyFull) : CompanyFull {
       if (c.id == id) {
         found := true;
         { c with
@@ -395,6 +482,7 @@ persistent actor {
           address = address; state = state; country = country;
           adminUsername = adminUsername; planStatus = planStatus;
           moduleAccess = moduleAccess; logoDataUrl = logoDataUrl;
+          notes = notes; updatedAt = Time.now();
         }
       } else c;
     });
@@ -403,29 +491,30 @@ persistent actor {
 
   public func updateCompanyStatus(id : Text, status : Text) : async Bool {
     var found = false;
-    companies := Array.map(companies, func(c : Company) : Company {
-      if (c.id == id) { found := true; { c with status = status } } else c;
+    companiesFull := Array.map(companiesFull, func(c : CompanyFull) : CompanyFull {
+      if (c.id == id) { found := true; { c with status = status; updatedAt = Time.now() } } else c;
     });
     found;
   };
 
   public func updateCompanyAdminPassword(companyId : Text, newPassword : Text) : async Bool {
     var found = false;
-    companies := Array.map(companies, func(c : Company) : Company {
-      if (c.id == companyId) { found := true; { c with adminPasswordHash = newPassword } } else c;
+    companiesFull := Array.map(companiesFull, func(c : CompanyFull) : CompanyFull {
+      if (c.id == companyId) { found := true; { c with adminPasswordHash = newPassword; updatedAt = Time.now() } } else c;
     });
     found;
   };
 
-  // ── Company Authentication ─────────────────────────────────────────────
+  // ── Company Authentication ─────────────────────────────────────────────────
 
   public func loginCompany(companyCode : Text, username : Text, password : Text) : async LoginResult {
-    // Bootstrap guard: if stable storage was reset, re-seed defaults
-    if (companies.size() == 0) { bootstrapDefaultCompanies() };
-    let upper = Text.map(companyCode, func(c : Char) : Char {
-      if (c >= 'a' and c <= 'z') Char.fromNat32(Char.toNat32(c) - 32) else c
-    });
-    let found = Array.find(companies, func(c : Company) : Bool { c.companyCode == upper });
+    // Bootstrap guard: if stable storage is empty, seed defaults
+    if (companiesFull.size() == 0) {
+      bootstrapDefaultCompaniesFull();
+      fullCompaniesBootstrapped := true;
+    };
+    let upper = toUpper(companyCode);
+    let found = Array.find(companiesFull, func(c : CompanyFull) : Bool { c.companyCode == upper });
     switch (found) {
       case null { return { success = false; token = ""; companyCode = ""; companyName = ""; role = ""; errorMsg = "Company not found" } };
       case (?company) {
@@ -472,7 +561,7 @@ persistent actor {
     companySessions.size() < before;
   };
 
-  // ── Super Admin Authentication ─────────────────────────────────────────
+  // ── Super Admin Authentication ─────────────────────────────────────────────
 
   public func loginSuperAdmin(username : Text, password : Text) : async SuperAdminLoginResult {
     if (username != "humanskeyai" or password != superAdminPassword) {
@@ -514,18 +603,50 @@ persistent actor {
     true;
   };
 
-  public query func getPlatformStats() : async { totalCompanies : Nat; activeCompanies : Nat; suspendedCompanies : Nat; inactiveCompanies : Nat; totalEmployees : Nat } {
-    let total = companies.size();
+  public query func getPlatformStats() : async PlatformStats {
+    let all = companiesFull;
+    let total = all.size();
     var active : Nat = 0; var suspended : Nat = 0; var inactive : Nat = 0;
-    for (c in companies.vals()) {
+    var trial : Nat = 0; var paid : Nat = 0;
+    for (c in all.vals()) {
       if (c.status == "active") active += 1
       else if (c.status == "suspended") suspended += 1
       else inactive += 1;
+      if (c.planStatus == "trial") trial += 1
+      else if (c.planStatus == "active") paid += 1;
     };
-    { totalCompanies = total; activeCompanies = active; suspendedCompanies = suspended; inactiveCompanies = inactive; totalEmployees = employeesV2.size() };
+    {
+      totalCompanies = total;
+      activeCompanies = active;
+      suspendedCompanies = suspended;
+      inactiveCompanies = inactive;
+      trialCompanies = trial;
+      paidCompanies = paid;
+      totalEmployees = tenantEmployees.size();
+      totalUsers = total; // at minimum 1 admin per company
+    };
   };
 
-  // ── Trades ────────────────────────────────────────────────────────────
+  public query func getTenantSummary(companyCode : Text) : async TenantSummary {
+    let upper = toUpper(companyCode);
+    let empCount = Array.filter(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == upper }).size();
+    let attCount = Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool { a.companyCode == upper }).size();
+    let payCount = Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool { p.companyCode == upper }).size();
+    let company = Array.find(companiesFull, func(c : CompanyFull) : Bool { c.companyCode == upper });
+    switch (company) {
+      case null {
+        { employeeCount = empCount; attendanceCount = attCount; payrollCount = payCount;
+          status = ""; plan = ""; modules = []; createdAt = 0; updatedAt = 0 }
+      };
+      case (?c) {
+        { employeeCount = empCount; attendanceCount = attCount; payrollCount = payCount;
+          status = c.status; plan = c.planStatus; modules = c.moduleAccess;
+          createdAt = c.createdAt; updatedAt = c.updatedAt }
+      };
+    };
+  };
+
+  // ── Trades ──────────────────────────────────────────────────────────────────
 
   public query func getTrades() : async { trades : [Trade]; activeTrades : [Trade] } {
     let active = Array.filter(trades, func(t : Trade) : Bool { t.status == "active" });
@@ -541,7 +662,7 @@ persistent actor {
     trades := Array.map(trades, func(t : Trade) : Trade { if (t.id == id) { found := true; { t with name = Text.trim(name, #char ' '); status = status } } else t }); found;
   };
 
-  // ── Departments ───────────────────────────────────────────────────────
+  // ── Departments ────────────────────────────────────────────────────────────────
 
   public query func getDepartments() : async { departments : [Department]; activeDepartments : [Department] } {
     let active = Array.filter(departments, func(d : Department) : Bool { d.status == "active" });
@@ -557,7 +678,7 @@ persistent actor {
     departments := Array.map(departments, func(d : Department) : Department { if (d.id == id) { found := true; { d with name = Text.trim(name, #char ' '); status = status } } else d }); found;
   };
 
-  // ── Sites ─────────────────────────────────────────────────────────────
+  // ── Sites ────────────────────────────────────────────────────────────────────
 
   public query func getSites() : async { sites : [Site]; activeSites : [Site] } {
     let active = Array.filter(sitesV2, func(s : Site) : Bool { s.status == "active" });
@@ -573,7 +694,7 @@ persistent actor {
     sitesV2 := Array.map(sitesV2, func(s : Site) : Site { if (s.id == id) { found := true; { s with name = Text.trim(name, #char ' '); status = status; lat = lat; lng = lng; radiusMeters = radiusMeters } } else s }); found;
   };
 
-  // ── Employees ─────────────────────────────────────────────────────────
+  // ── Employees ───────────────────────────────────────────────────────────────
 
   public query func getEmployees() : async { allEmployees : [Employee]; activeEmployees : [Employee] } {
     let active = Array.filter(employeesV2, func(e : Employee) : Bool { e.status == "active" });
@@ -593,7 +714,7 @@ persistent actor {
     employeesV2 := Array.map(employeesV2, func(e : Employee) : Employee { if (e.id == id) { found := true; { emp with id = id; createdAt = e.createdAt } } else e }); found;
   };
 
-  // ── Tenant-Aware Employee Methods ──────────────────────────────────────
+  // ── Tenant-Aware Employee Methods ──────────────────────────────────────────────
   public query func getEmployeesByCompany(companyCode : Text) : async { allEmployees : [TenantEmployee]; activeEmployees : [TenantEmployee] } {
     let filtered = Array.filter(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == companyCode });
     let active = Array.filter(filtered, func(e : TenantEmployee) : Bool { e.status == "active" });
@@ -613,7 +734,7 @@ persistent actor {
     }); found;
   };
 
-  // ── Attendance (legacy non-tenant methods) ────────────────────────────
+  // ── Attendance (legacy non-tenant methods) ──────────────────────────────────────
 
   public func markAttendance(employeeId : Text, date : Text, attStatus : Text, otHours : Float, punchIn : Text, punchOut : Text, lat : Float, lng : Float, source : Text) : async Bool {
     if (Array.find(attendanceV2, func(a : AttendanceRecord) : Bool { a.employeeId == employeeId and a.date == date }) != null) return false;
@@ -658,14 +779,12 @@ persistent actor {
     attendanceV2 := Array.map(attendanceV2, func(a : AttendanceRecord) : AttendanceRecord { if (a.id == id) { found := true; { a with isFlagged = true; flagReason = reason; updatedAt = Time.now() } } else a }); found;
   };
 
-  // ── Tenant-Aware Attendance Methods ────────────────────────────────────
+  // ── Tenant-Aware Attendance Methods ────────────────────────────────────────────
 
-  // Get all attendance records for a company (used for initial sync / migration)
   public query func getAllAttendanceByCompany(companyCode : Text) : async [TenantAttendanceRecord] {
     Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool { a.companyCode == companyCode });
   };
 
-  // Get attendance for a company filtered by month/year
   public query func getAttendanceByCompanyAndMonth(companyCode : Text, month : Text, year : Text) : async [TenantAttendanceRecord] {
     let mm = if (Text.size(month) == 1) "0" # month else month;
     let prefix = year # mm;
@@ -674,7 +793,6 @@ persistent actor {
     });
   };
 
-  // Mark attendance for a company (skips duplicate)
   public func markAttendanceForCompany(
     companyCode : Text, employeeId : Text, date : Text,
     attStatus : Text, otHours : Float, advanceAmount : Float,
@@ -695,7 +813,6 @@ persistent actor {
     true;
   };
 
-  // Mark attendance overwrite (upsert)
   public func markAttendanceOverwriteForCompany(
     companyCode : Text, employeeId : Text, date : Text,
     attStatus : Text, otHours : Float, advanceAmount : Float,
@@ -719,7 +836,6 @@ persistent actor {
     }]);
   };
 
-  // Delete a single attendance record for a company
   public func deleteAttendanceForCompany(companyCode : Text, employeeId : Text, date : Text) : async Bool {
     let before = tenantAttendance.size();
     tenantAttendance := Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
@@ -728,7 +844,6 @@ persistent actor {
     tenantAttendance.size() < before;
   };
 
-  // Bulk mark attendance for a company (skip duplicates)
   public func bulkMarkAttendanceForCompany(
     companyCode : Text,
     records : [(Text, Text, Text, Float)],
@@ -757,7 +872,6 @@ persistent actor {
     { successCount = success; skippedCount = skipped; errors = [] };
   };
 
-  // Bulk mark attendance overwrite for a company
   public func bulkMarkAttendanceOverwriteForCompany(
     companyCode : Text,
     records : [(Text, Text, Text, Float)],
@@ -787,7 +901,6 @@ persistent actor {
     { successCount = success; skippedCount = 0; errors = [] };
   };
 
-  // Update OT for a tenant attendance record
   public func updateAttendanceOTForCompany(
     companyCode : Text, employeeId : Text, date : Text, otHours : Float, source : Text
   ) : async Bool {
@@ -800,7 +913,6 @@ persistent actor {
     found;
   };
 
-  // Update advance amount for a tenant attendance record
   public func updateAttendanceAdvanceForCompany(
     companyCode : Text, employeeId : Text, date : Text, advanceAmount : Float, source : Text
   ) : async Bool {
@@ -813,7 +925,6 @@ persistent actor {
     found;
   };
 
-  // Regularize a tenant attendance record
   public func regularizeAttendanceForCompany(
     companyCode : Text, id : Text, newStatus : Text, newOtHours : Float, reason : Text, changedBy : Text
   ) : async Bool {
@@ -828,7 +939,6 @@ persistent actor {
     found;
   };
 
-  // Flag a tenant attendance record
   public func flagAttendanceForCompany(companyCode : Text, id : Text, reason : Text) : async Bool {
     var found = false;
     tenantAttendance := Array.map(tenantAttendance, func(a : TenantAttendanceRecord) : TenantAttendanceRecord {
@@ -839,7 +949,7 @@ persistent actor {
     found;
   };
 
-  // ── Regularization Requests ───────────────────────────────────────────
+  // ── Regularization Requests ──────────────────────────────────────────────────
 
   public func createRegularizationRequest(employeeId : Text, date : Text, oldStatus : Text, requestedStatus : Text, reason : Text, requestedBy : Text) : async Bool {
     regularizationRequests := Array.append(regularizationRequests, [{ id = nextId(); employeeId = employeeId; date = date; oldStatus = oldStatus; requestedStatus = requestedStatus; reason = reason; requestedBy = requestedBy; approvalStatus = "pending"; approvedBy = ""; approvedAt = 0; createdAt = Time.now() }]); true;
@@ -864,7 +974,7 @@ persistent actor {
     }); found;
   };
 
-  // ── Advances ──────────────────────────────────────────────────────────
+  // ── Advances ──────────────────────────────────────────────────────────────────
 
   public func addAdvance(employeeId : Text, amount : Float, date : Text, site : Text) : async Bool {
     advances := Array.append(advances, [{ id = nextId(); employeeId = employeeId; amount = amount; date = date; site = site; createdAt = Time.now() }]); true;
@@ -873,11 +983,11 @@ persistent actor {
     Array.filter(advances, func(a : Advance) : Bool { a.employeeId == employeeId });
   };
 
-  // ── Audit ─────────────────────────────────────────────────────────────
+  // ── Audit ──────────────────────────────────────────────────────────────────
 
   public query func getAuditLogs() : async [AuditLog] { auditLogs };
 
-  // ── Payroll ───────────────────────────────────────────────────────────
+  // ── Payroll ───────────────────────────────────────────────────────────────
 
   func calcPayroll(emp : Employee, month : Nat, year : Nat) : PayrollRecord {
     let prefix = Nat.toText(year) # padMonth(month);
@@ -978,7 +1088,7 @@ persistent actor {
     found;
   };
 
-  // ── Tenant-Aware Payroll Methods ────────────────────────────────────────
+  // ── Tenant-Aware Payroll Methods ──────────────────────────────────────────────
 
   public query func getPayrollByCompanyAndMonth(companyCode : Text, month : Nat, year : Nat) : async [TenantPayrollRecord] {
     Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
@@ -986,12 +1096,15 @@ persistent actor {
     });
   };
 
+  public query func getAllPayrollByCompany(companyCode : Text) : async [TenantPayrollRecord] {
+    Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
+      p.companyCode == companyCode
+    });
+  };
+
   public func savePayrollForCompany(companyCode : Text, records : [TenantPayrollRecord]) : async Nat {
-    // Remove existing records for this company+month+year combination (based on first record's month/year)
-    // Then insert all provided records (upsert by employeeId+month+year)
     var count : Nat = 0;
     for (rec in records.vals()) {
-      // Remove any existing record for this employee+month+year
       tenantPayroll := Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
         not (p.companyCode == companyCode and p.employeeId == rec.employeeId and p.month == rec.month and p.year == rec.year)
       });
@@ -1025,7 +1138,7 @@ persistent actor {
     found;
   };
 
-  // ── Supervisors ───────────────────────────────────────────────────────
+  // ── Supervisors ───────────────────────────────────────────────────────────────
 
   public query func getSupervisors() : async [Supervisor] { supervisorsV2 };
   public func addSupervisor(phone : Text, name : Text, siteId : Text, pin : Text) : async Bool {

@@ -225,7 +225,7 @@ export interface RegularizationRequest {
   createdAt: bigint;
 }
 
-// Company & Auth types
+// Company & Auth types — CompanyFull is the current canister type
 export interface Company {
   id: string;
   companyCode: string;
@@ -241,7 +241,20 @@ export interface Company {
   planStatus: string;
   moduleAccess: string[];
   logoDataUrl: string;
+  notes: string;
+  updatedAt: bigint;
   createdAt: bigint;
+}
+
+export interface TenantSummary {
+  employeeCount: bigint;
+  attendanceCount: bigint;
+  payrollCount: bigint;
+  status: string;
+  plan: string;
+  modules: string[];
+  createdAt: bigint;
+  updatedAt: bigint;
 }
 
 export interface CompanySession {
@@ -283,7 +296,10 @@ export interface PlatformStats {
   activeCompanies: bigint;
   suspendedCompanies: bigint;
   inactiveCompanies: bigint;
+  trialCompanies: bigint;
+  paidCompanies: bigint;
   totalEmployees: bigint;
+  totalUsers: bigint;
 }
 
 export interface backendInterface {
@@ -303,7 +319,7 @@ export interface backendInterface {
   updateCompany: (
     id: string, companyName: string, legalName: string, brandName: string,
     address: string, state: string, country: string,
-    adminUsername: string, planStatus: string, moduleAccess: string[], logoDataUrl: string
+    adminUsername: string, planStatus: string, moduleAccess: string[], logoDataUrl: string, notes: string
   ) => Promise<boolean>;
   updateCompanyStatus: (id: string, status: string) => Promise<boolean>;
   updateCompanyAdminPassword: (companyId: string, newPassword: string) => Promise<boolean>;
@@ -319,8 +335,9 @@ export interface backendInterface {
   logoutSuperAdminSession: (token: string) => Promise<boolean>;
   changeSuperAdminPassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
 
-  // Platform stats
+  // Platform stats and tenant inspection
   getPlatformStats: () => Promise<PlatformStats>;
+  getTenantSummary: (companyCode: string) => Promise<TenantSummary>;
 
   getTrades: () => Promise<{ trades: Trade[]; activeTrades: Trade[] }>;
   createTrade: (name: string) => Promise<boolean>;
@@ -388,11 +405,12 @@ export interface backendInterface {
 
   // Tenant-aware payroll methods
   getPayrollByCompanyAndMonth: (companyCode: string, month: number, year: number) => Promise<TenantPayrollRecord[]>;
+  getAllPayrollByCompany: (companyCode: string) => Promise<TenantPayrollRecord[]>;
   savePayrollForCompany: (companyCode: string, records: TenantPayrollRecord[]) => Promise<number>;
   deletePayrollForCompanyAndMonth: (companyCode: string, month: number, year: number) => Promise<number>;
   updatePayrollDeductionForCompany: (companyCode: string, employeeId: string, month: number, year: number, ptDeduction: number, advanceDeduction: number, otherDeduction: number) => Promise<boolean>;
 
-    getSupervisors: () => Promise<Supervisor[]>;
+  getSupervisors: () => Promise<Supervisor[]>;
   addSupervisor: (phone: string, name: string, siteId: string, pin: string) => Promise<boolean>;
   removeSupervisor: (phone: string) => Promise<boolean>;
   verifySupervisorPin: (phone: string, pin: string) => Promise<boolean>;

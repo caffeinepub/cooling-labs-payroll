@@ -25,6 +25,7 @@ import { Regularization } from "./pages/attendance/Regularization";
 import { SingleEntry } from "./pages/attendance/SingleEntry";
 import { WhatsApp } from "./pages/attendance/WhatsApp";
 import { Companies } from "./pages/superadmin/Companies";
+import { PlatformSettings } from "./pages/superadmin/PlatformSettings";
 import { SuperAdminChangePassword } from "./pages/superadmin/SuperAdminChangePassword";
 import { SuperAdminDashboard } from "./pages/superadmin/SuperAdminDashboard";
 import {
@@ -149,6 +150,11 @@ const superAdminCompaniesRoute = createRoute({
   path: "/superadmin/companies",
   component: Companies,
 });
+const superAdminSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/superadmin/settings",
+  component: PlatformSettings,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -173,6 +179,7 @@ const routeTree = rootRoute.addChildren([
   superAdminDashboardRoute,
   superAdminCompaniesRoute,
   superAdminChangePasswordRoute,
+  superAdminSettingsRoute,
 ]);
 
 const router = createRouter({ routeTree });

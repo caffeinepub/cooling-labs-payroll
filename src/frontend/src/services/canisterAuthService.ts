@@ -1,14 +1,17 @@
 /**
  * canisterAuthService.ts
  * Centralised authentication via ICP canister.
- * Sessions (tokens) are stored in the canister; the token is cached in
- * sessionStorage (tab-scoped) and localStorage (cross-tab persistence).
- * Falls back to localStorage-based tenantStorage on canister errors.
+ * Sessions (tokens) are stored in the canister; the token is cached in localStorage.
+ *
+ * CRITICAL FIX: Local auth fallback is ONLY used when the canister is unreachable
+ * (throws an exception). If the canister returns success:false, that is the
+ * authoritative answer — we do NOT fall through to local storage.
+ * This ensures cross-browser consistency: same credentials always behave the same
+ * regardless of what is stored in any browser's localStorage.
  */
 
 import { getActor } from "./backendService";
 import {
-  getCompanyByCode,
   clearCompanySession as localClearCompanySession,
   clearSuperAdminSession as localClearSuperAdminSession,
   getCompanySession as localGetCompanySession,
@@ -104,18 +107,28 @@ export async function loginCompanyCanister(
       console.log("[CanisterAuth] Company login via canister:", companyCode);
       return { success: true, session, errorMsg: "", source: "canister" };
     }
-    // Canister returned success:false — fall through to local fallback
-    console.warn(
-      "[CanisterAuth] Canister returned failure, falling back to local. Reason:",
-      result.errorMsg,
-    );
+
+    // CRITICAL: Canister is reachable and returned success:false.
+    // This is the authoritative answer — do NOT fall through to local.
+    // Doing so would create cross-browser inconsistency.
+    console.log("[CanisterAuth] Canister rejected login:", result.errorMsg);
+    return {
+      success: false,
+      session: null,
+      errorMsg:
+        result.errorMsg || "Invalid company code, username, or password",
+      source: "canister",
+    };
   } catch (err) {
+    // Canister is unreachable (network error, canister down, etc.)
+    // ONLY in this case do we fall back to local credentials
     console.warn(
-      "[CanisterAuth] Canister login failed, falling back to local:",
+      "[CanisterAuth] Canister unreachable, falling back to local:",
       err,
     );
   }
-  // Local fallback (runs on canister error OR canister success:false)
+
+  // Local fallback — ONLY reached when canister throws (is unreachable)
   {
     const localSession = localLoginCompany(companyCode, username, password);
     if (localSession) {
@@ -132,20 +145,10 @@ export async function loginCompanyCanister(
       localStorage.setItem(COMPANY_SESSION_CACHE_KEY, JSON.stringify(session));
       return { success: true, session, errorMsg: "", source: "local" };
     }
-    // Check why local failed — suspended?
-    const company = getCompanyByCode(companyCode);
-    if (company && company.status !== "active") {
-      return {
-        success: false,
-        session: null,
-        errorMsg: `Company is ${company.status}. Please contact HumanskeyAI support.`,
-        source: "local",
-      };
-    }
     return {
       success: false,
       session: null,
-      errorMsg: "Invalid company code, username, or password",
+      errorMsg: "Unable to connect to server. Please try again.",
       source: "local",
     };
   }
@@ -161,7 +164,6 @@ export async function validateCompanySession(): Promise<CanisterCompanySession |
   if (token.startsWith("local-")) {
     const cached = localStorage.getItem(COMPANY_SESSION_CACHE_KEY);
     if (!cached) return null;
-    // Also validate via tenantStorage
     const localSession = localGetCompanySession();
     if (!localSession) return null;
     try {
@@ -276,18 +278,23 @@ export async function loginSuperAdminCanister(
       console.log("[CanisterAuth] Super Admin login via canister");
       return { success: true, session, errorMsg: "", source: "canister" };
     }
-    // Canister returned success:false — fall through to local fallback
-    console.warn(
-      "[CanisterAuth] Canister SA returned failure, falling back to local. Reason:",
-      result.errorMsg,
-    );
+    // CRITICAL: Canister is reachable and returned success:false — authoritative
+    console.log("[CanisterAuth] Canister rejected SA login:", result.errorMsg);
+    return {
+      success: false,
+      session: null,
+      errorMsg: result.errorMsg || "Invalid Super Admin credentials",
+      source: "canister",
+    };
   } catch (err) {
+    // Canister unreachable — fall back to local
     console.warn(
-      "[CanisterAuth] Canister super admin login failed, falling back to local:",
+      "[CanisterAuth] Canister unreachable for SA login, falling back to local:",
       err,
     );
   }
-  // Local fallback
+
+  // Local fallback — ONLY reached when canister throws
   {
     const ok = localLoginSuperAdmin(username, password);
     if (ok) {
@@ -305,7 +312,7 @@ export async function loginSuperAdminCanister(
     return {
       success: false,
       session: null,
-      errorMsg: "Invalid Super Admin credentials",
+      errorMsg: "Unable to connect to server. Please try again.",
       source: "local",
     };
   }

@@ -3,10 +3,9 @@
  *
  * Tenant-aware attendance backed by ICP canister.
  * Strategy:
- *   - Writes: dual-write to canister (primary) + localStorage (local cache)
- *   - Reads:  always served from localStorage (fast, sync)
- *   - Sync:   syncAttendanceFromCanister() fetches all company attendance from canister
- *             and seeds localStorage — called on every login / page load
+ *   - Writes: canister (primary). localStorage is updated as a UI cache only.
+ *   - Reads:  always from canister on login/sync, seeded into localStorage.
+ *   - Migration: always attempted when canister is empty (no blocking flag).
  *
  * This ensures data persists across devices, browsers, and logins.
  */
@@ -49,15 +48,11 @@ function mapFromCanister(raw: TenantAttRaw): AttendanceRecord {
   };
 }
 
-// Key used to track if migration has run for this company
-function migrationKey(companyCode: string): string {
-  return `hkai_att_migrated_${companyCode}`;
-}
-
 /**
  * Fetch all attendance for the active company from canister,
  * write them into localStorage so sync reads work correctly.
- * Also migrates any pre-existing localStorage data to canister.
+ * Migration from localStorage is ALWAYS attempted when canister is empty
+ * (no blocking flag) to handle any browser that has data not yet in canister.
  */
 export async function syncAttendanceFromCanister(): Promise<{
   count: number;
@@ -79,53 +74,46 @@ export async function syncAttendanceFromCanister(): Promise<{
       return { count: records.length, source: "canister" };
     }
 
-    // Canister is empty — check if we have localStorage data to migrate
-    const migratedFlag = localStorage.getItem(migrationKey(companyCode));
-    if (!migratedFlag) {
-      // One-time migration: push localStorage attendance to canister
-      const localRecords = attendanceStorage.getAllAttendanceRaw(companyCode);
-      if (localRecords.length > 0) {
-        console.log(
-          `[CanisterAtt] Migrating ${localRecords.length} records from localStorage to canister for ${companyCode}...`,
-        );
-        for (const rec of localRecords) {
-          try {
-            await backendService.markAttendanceForCompany(
-              companyCode,
-              rec.employeeId,
-              rec.date,
-              rec.status,
-              rec.otHours,
-              rec.advanceAmount ?? 0,
-              rec.punchIn ?? "",
-              rec.punchOut ?? "",
-              rec.lat ?? 0,
-              rec.lng ?? 0,
-              rec.changedBy ?? "admin",
-            );
-          } catch (e) {
-            console.warn(
-              `[CanisterAtt] Migration failed for ${rec.employeeId}/${rec.date}`,
-              e,
-            );
-          }
-        }
-        localStorage.setItem(migrationKey(companyCode), "1");
-        // Re-fetch after migration
-        const afterRaw = (await backendService.getAllAttendanceByCompany(
-          companyCode,
-        )) as TenantAttRaw[];
-        if (afterRaw.length > 0) {
-          const afterRecords = afterRaw.map(mapFromCanister);
-          seedLocalStorage(companyCode, afterRecords);
-          console.log(
-            `[CanisterAtt] Post-migration: ${afterRecords.length} records in canister`,
+    // Canister is empty — ALWAYS try to migrate from localStorage
+    // (no blocking migration flag — this browser might have data the canister doesn't)
+    const localRecords = attendanceStorage.getAllAttendanceRaw(companyCode);
+    if (localRecords.length > 0) {
+      console.log(
+        `[CanisterAtt] Migrating ${localRecords.length} records from localStorage to canister for ${companyCode}...`,
+      );
+      for (const rec of localRecords) {
+        try {
+          await backendService.markAttendanceForCompany(
+            companyCode,
+            rec.employeeId,
+            rec.date,
+            rec.status,
+            rec.otHours,
+            rec.advanceAmount ?? 0,
+            rec.punchIn ?? "",
+            rec.punchOut ?? "",
+            rec.lat ?? 0,
+            rec.lng ?? 0,
+            rec.changedBy ?? "admin",
           );
-          return { count: afterRecords.length, source: "canister" };
+        } catch (e) {
+          console.warn(
+            `[CanisterAtt] Migration failed for ${rec.employeeId}/${rec.date}`,
+            e,
+          );
         }
-      } else {
-        // No local data and no canister data — mark migration done
-        localStorage.setItem(migrationKey(companyCode), "1");
+      }
+      // Re-fetch after migration
+      const afterRaw = (await backendService.getAllAttendanceByCompany(
+        companyCode,
+      )) as TenantAttRaw[];
+      if (afterRaw.length > 0) {
+        const afterRecords = afterRaw.map(mapFromCanister);
+        seedLocalStorage(companyCode, afterRecords);
+        console.log(
+          `[CanisterAtt] Post-migration: ${afterRecords.length} records in canister`,
+        );
+        return { count: afterRecords.length, source: "canister" };
       }
     }
 
@@ -141,13 +129,11 @@ export async function syncAttendanceFromCanister(): Promise<{
 
 /**
  * Overwrite the company's attendance in localStorage with records from canister.
- * This is safe because canister is source of truth.
  */
 function seedLocalStorage(
   companyCode: string,
   records: AttendanceRecord[],
 ): void {
-  // attendanceStorage uses getTenantKey internally; we write raw records directly
   const key = getTenantKey(companyCode, "clf_attendance");
   const rawRecords = records.map((r) => ({
     ...r,
@@ -162,7 +148,7 @@ function seedLocalStorage(
   }
 }
 
-// ── Write operations (dual-write) ────────────────────────────────────────
+// ── Write operations ─────────────────────────────────────────────────────────────────────────
 
 export async function markAttendanceInCanister(
   empId: string,
