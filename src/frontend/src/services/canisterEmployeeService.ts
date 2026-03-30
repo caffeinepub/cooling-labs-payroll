@@ -1,10 +1,16 @@
 /**
  * canisterEmployeeService.ts
- * Wraps canister tenant-aware employee methods with localStorage fallback.
+ * Wraps canister tenant-aware employee methods.
+ *
+ * KEY FIX: After loading employees from canister, we:
+ * 1. Build an oldId→newId remap by matching on employeeId (human code)
+ * 2. Remap attendance and payroll localStorage records to use canister IDs
+ * 3. Overwrite workforceStorage with canister employees
+ *    so payroll engine always uses consistent IDs
  */
 import type { Employee } from "../types";
 import { backendService } from "./backendService";
-import { getActiveCompanyId } from "./tenantStorage";
+import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 import * as workforceStorage from "./workforceStorage";
 
 type TenantEmployeeRaw = Record<string, unknown>;
@@ -82,6 +88,93 @@ function mapToCanister(emp: Employee, companyCode: string): TenantEmployeeRaw {
   };
 }
 
+/**
+ * Overwrite workforceStorage with canister employees so that payroll engine,
+ * which calls workforceStorage.getEmployees(), always uses canister-consistent IDs.
+ */
+function seedWorkforceStorage(employees: Employee[]): void {
+  const companyCode = getActiveCompanyId();
+  const key = getTenantKey(companyCode, "clf_employees");
+  try {
+    const raw = employees.map((e) => ({
+      ...e,
+      createdAt: Number(e.createdAt),
+    }));
+    localStorage.setItem(key, JSON.stringify(raw));
+  } catch (e) {
+    console.warn("[CanisterEmp] Failed to seed workforceStorage:", e);
+  }
+}
+
+/**
+ * After loading canister employees, build a remapping from any old localStorage
+ * employee IDs to the canister IDs by matching on the human-readable employeeId
+ * (e.g. EMP001). Then remap attendance and payroll records in localStorage so
+ * payroll calculation finds the correct attendance and displays correct names.
+ */
+function remapStorageIds(
+  canisterEmployees: Employee[],
+  localEmployees: Employee[],
+): void {
+  const companyCode = getActiveCompanyId();
+
+  // Build old-ID → new-ID map by matching on employeeId (human code)
+  const idMap: Record<string, string> = {};
+  for (const le of localEmployees) {
+    const ce = canisterEmployees.find(
+      (c) => c.employeeId === le.employeeId && c.id !== le.id,
+    );
+    if (ce) {
+      idMap[le.id] = ce.id;
+    }
+  }
+
+  if (Object.keys(idMap).length === 0) return;
+  console.log(
+    "[CanisterEmp] Remapping IDs in localStorage:",
+    Object.keys(idMap).length,
+    "employee ID changes",
+  );
+
+  // Remap attendance records
+  const attKey = getTenantKey(companyCode, "clf_attendance");
+  try {
+    const raw = localStorage.getItem(attKey);
+    if (raw) {
+      const records = JSON.parse(raw);
+      const remapped = records.map((r: Record<string, unknown>) => ({
+        ...r,
+        employeeId: idMap[String(r.employeeId)] ?? r.employeeId,
+      }));
+      localStorage.setItem(attKey, JSON.stringify(remapped));
+      console.log(
+        "[CanisterEmp] Remapped",
+        records.length,
+        "attendance records",
+      );
+    }
+  } catch (e) {
+    console.warn("[CanisterEmp] Attendance remap failed:", e);
+  }
+
+  // Remap payroll records
+  const payrollKey = getTenantKey(companyCode, "clf_payroll");
+  try {
+    const raw = localStorage.getItem(payrollKey);
+    if (raw) {
+      const records = JSON.parse(raw);
+      const remapped = records.map((r: Record<string, unknown>) => ({
+        ...r,
+        employeeId: idMap[String(r.employeeId)] ?? r.employeeId,
+      }));
+      localStorage.setItem(payrollKey, JSON.stringify(remapped));
+      console.log("[CanisterEmp] Remapped", records.length, "payroll records");
+    }
+  } catch (e) {
+    console.warn("[CanisterEmp] Payroll remap failed:", e);
+  }
+}
+
 export async function loadEmployeesFromCanister(): Promise<{
   allEmployees: Employee[];
   activeEmployees: Employee[];
@@ -105,6 +198,16 @@ export async function loadEmployeesFromCanister(): Promise<{
         "employees from canister for",
         companyCode,
       );
+
+      // Get local employees BEFORE overwriting, for ID remapping
+      const localEmployees = workforceStorage.getEmployees().allEmployees;
+
+      // Remap attendance + payroll records to use canister IDs
+      remapStorageIds(all, localEmployees);
+
+      // Overwrite workforceStorage with canister employees so payroll engine uses correct IDs
+      seedWorkforceStorage(all);
+
       return { allEmployees: all, activeEmployees: active, source: "canister" };
     }
 
@@ -137,6 +240,11 @@ export async function loadEmployeesFromCanister(): Promise<{
       const activeAfter = (afterMigration.activeEmployees ?? []).map(
         mapFromCanister,
       );
+
+      // After migration, IDs may have changed — remap stored data
+      remapStorageIds(allAfter, local.allEmployees);
+      seedWorkforceStorage(allAfter);
+
       console.log(
         "[CanisterEmp] After migration:",
         allAfter.length,

@@ -739,7 +739,8 @@ persistent actor {
   public func createEmployeeForCompany(companyCode : Text, emp : TenantEmployee) : async Bool {
     let code = companyCode;
     if (Array.find(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == code and e.employeeId == emp.employeeId }) != null) return false;
-    let newEmp = { emp with id = nextId(); companyCode = code; createdAt = Time.now() };
+    let newId = if (emp.id != "") emp.id else nextId();
+    let newEmp = { emp with id = newId; companyCode = code; createdAt = Time.now() };
     tenantEmployees := Array.append(tenantEmployees, [newEmp]); true;
   };
   public func updateEmployeeForCompany(companyCode : Text, id : Text, emp : TenantEmployee) : async Bool {

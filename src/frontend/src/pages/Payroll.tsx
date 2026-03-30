@@ -269,7 +269,7 @@ function CalcSummaryPanel({
 }
 
 export function Payroll() {
-  const { isAdmin, employees } = useAppContext();
+  const { isAdmin, employees, attendanceSynced } = useAppContext();
   const { toasts, addToast, removeToast } = useToast();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -277,6 +277,7 @@ export function Payroll() {
   const [breakdowns, setBreakdowns] = useState<PayrollBreakdownExtended[]>([]);
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [payrollError, setPayrollError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [overwriteOpen, setOverwriteOpen] = useState(false);
   const [overrideTarget, setOverrideTarget] =
@@ -301,12 +302,35 @@ export function Payroll() {
   const [payslipTarget, setPayslipTarget] =
     useState<PayrollBreakdownExtended | null>(null);
 
-  const empMap: Record<string, Employee> = Object.fromEntries(
-    employees.map((e) => [e.id, e]),
-  );
+  // Dual-key empMap: keyed by both e.id (internal UUID) AND e.employeeId (human code e.g. EMP001)
+  // This handles cases where payroll records may reference either key depending on migration state
+  const empMap: Record<string, Employee> = (() => {
+    const map: Record<string, Employee> = {};
+    for (const e of employees) {
+      if (e.id) map[e.id] = e;
+      if (e.employeeId) map[e.employeeId] = e;
+    }
+    return map;
+  })();
 
-  const loadPayroll = useCallback(() => {
+  // Canister-first load: always sync from backend before reading localStorage.
+  // This guarantees Browser 2 (fresh/incognito) gets identical data to Browser 1.
+  const loadPayroll = useCallback(async () => {
     setLoading(true);
+    setPayrollError(null);
+    try {
+      // Sync from canister first — populates localStorage with canonical backend data
+      await canisterPayroll.syncPayrollFromCanister();
+    } catch (e) {
+      console.error("[Payroll] Canister sync failed:", e);
+      // Show explicit error instead of zero/empty payroll
+      setPayrollError(
+        "Failed to load payroll from backend. Please refresh and try again.",
+      );
+      setLoading(false);
+      return;
+    }
+    // Now read from localStorage (which is now populated from canister)
     setBreakdowns(
       payrollStorage.getPayrollWithBreakdown(BigInt(month), BigInt(year)),
     );
@@ -314,9 +338,11 @@ export function Payroll() {
     setLoading(false);
   }, [month, year]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: attendanceSynced intentionally re-triggers payroll load after backend sync
   useEffect(() => {
-    loadPayroll();
-  }, [loadPayroll]);
+    void loadPayroll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadPayroll, attendanceSynced]);
 
   // Auto-compute net pay in override form
   const computedNetPay = useMemo(() => {
@@ -335,7 +361,7 @@ export function Payroll() {
           `Generated for ${String(res.generatedCount)} employees`,
           "success",
         );
-        loadPayroll();
+        void loadPayroll();
         setOverwriteOpen(false);
       } catch {
         addToast("Generation failed", "error");
@@ -405,7 +431,7 @@ export function Payroll() {
     if (ok) {
       addToast("Payroll updated", "success");
       setOverrideTarget(null);
-      loadPayroll();
+      void loadPayroll();
     } else {
       addToast("Update failed", "error");
     }
@@ -438,7 +464,7 @@ export function Payroll() {
     if (ok) {
       addToast("PT updated", "success");
       setPtTarget(null);
-      loadPayroll();
+      void loadPayroll();
     } else {
       addToast("PT update failed", "error");
     }
@@ -462,7 +488,7 @@ export function Payroll() {
     if (ok) {
       addToast("Advance deduction updated — Net Pay recalculated", "success");
       setAdvTarget(null);
-      loadPayroll();
+      void loadPayroll();
     } else {
       addToast("Update failed", "error");
     }
@@ -487,7 +513,7 @@ export function Payroll() {
     if (ok) {
       addToast("Other deduction updated — Net Pay recalculated", "success");
       setOtherDedTarget(null);
-      loadPayroll();
+      void loadPayroll();
     } else {
       addToast("Update failed", "error");
     }
@@ -590,6 +616,7 @@ export function Payroll() {
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none"
+              data-ocid="payroll.select"
             >
               {MONTHS.map((m, i) => (
                 <option key={m} value={i + 1}>
@@ -605,9 +632,14 @@ export function Payroll() {
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
               className="w-24 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none"
+              data-ocid="payroll.input"
             />
           </div>
-          <Button onClick={handleGenerate} disabled={generating}>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            data-ocid="payroll.primary_button"
+          >
             <IndianRupee className="w-4 h-4 mr-1" />
             {generating
               ? "Generating..."
@@ -618,10 +650,21 @@ export function Payroll() {
         </div>
       </div>
 
+      {/* Backend error banner — shown instead of zeros when canister is unreachable */}
+      {payrollError && (
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2"
+          data-ocid="payroll.error_state"
+        >
+          <span>⚠️</span>
+          <span>{payrollError}</span>
+        </div>
+      )}
+
       {loading && <PageLoader />}
 
       {/* Summary cards */}
-      {summary && Number(summary.totalEmployees) > 0 && (
+      {!payrollError && summary && Number(summary.totalEmployees) > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
@@ -657,7 +700,7 @@ export function Payroll() {
       )}
 
       {/* Formula note */}
-      {breakdowns.length > 0 && (
+      {!payrollError && breakdowns.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 leading-relaxed">
           <strong>Payroll Formula:</strong> Earned = (Monthly Component / Total
           Days) x Paid Days &nbsp;|&nbsp;{" "}
@@ -669,8 +712,24 @@ export function Payroll() {
         </div>
       )}
 
+      {/* No payroll generated yet — shown only when canister is reachable but has no data */}
+      {!payrollError && !loading && breakdowns.length === 0 && (
+        <div
+          className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center"
+          data-ocid="payroll.empty_state"
+        >
+          <IndianRupee className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">
+            No payroll generated for {monthLabel}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Click &quot;Generate Payroll&quot; to run payroll for this month.
+          </p>
+        </div>
+      )}
+
       {/* Payroll table */}
-      {breakdowns.length > 0 && (
+      {!payrollError && breakdowns.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-700">
@@ -678,7 +737,7 @@ export function Payroll() {
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" data-ocid="payroll.table">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   {headers.map((h) => (
@@ -692,7 +751,7 @@ export function Payroll() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {breakdowns.map((bd) => {
+                {breakdowns.map((bd, idx) => {
                   const rec = bd.record;
                   const emp = empMap[rec.employeeId];
                   const isExpanded = expandedRows.has(rec.id);
@@ -704,6 +763,7 @@ export function Payroll() {
                         onKeyDown={(e) =>
                           e.key === "Enter" && toggleRow(rec.id)
                         }
+                        data-ocid={`payroll.item.${idx + 1}`}
                       >
                         <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">
                           <div className="flex items-center gap-1">
@@ -1134,13 +1194,46 @@ export function Payroll() {
         </DialogContent>
       </Dialog>
 
-      {/* Payslip Modal */}
-      {payslipTarget && empMap[payslipTarget.record.employeeId] && (
+      {/* Payslip Modal — render even if employee not found in empMap (use fallback) */}
+      {payslipTarget && (
         <PayslipModal
           open={!!payslipTarget}
           onClose={() => setPayslipTarget(null)}
           bd={payslipTarget}
-          employee={empMap[payslipTarget.record.employeeId]}
+          employee={
+            empMap[payslipTarget.record.employeeId] ??
+            ({
+              id: payslipTarget.record.employeeId,
+              employeeId: payslipTarget.record.employeeId,
+              name: empMap[payslipTarget.record.employeeId]?.name ?? "Employee",
+              mobile: "",
+              site: "",
+              tradeId: "",
+              departmentId: "",
+              status: "active",
+              salaryMode: "auto",
+              cityType: "non-metro",
+              basicSalary: 0,
+              hra: 0,
+              conveyance: 0,
+              specialAllowance: 0,
+              otherAllowance: 0,
+              otRate: 0,
+              pfApplicable: false,
+              esiApplicable: false,
+              aadhaarNumber: "",
+              panNumber: "",
+              uanNumber: "",
+              esiNumber: "",
+              bankAccountHolderName: "",
+              bankAccountNumber: "",
+              ifscCode: "",
+              bankName: "",
+              branchAddress: "",
+              dateOfJoining: "",
+              createdAt: BigInt(0),
+            } as Employee)
+          }
           monthLabel={`${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][month - 1]} ${year}`}
           month={month}
           year={year}

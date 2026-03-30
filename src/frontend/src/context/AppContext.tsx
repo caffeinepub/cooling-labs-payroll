@@ -88,14 +88,17 @@ export function AppContextProvider({
     try {
       setAttendanceSynced(false);
       const result = await syncAttendanceFromCanister();
-      setAttendanceSynced(true);
-      // Also sync payroll — await it so data is ready before loading=false
+      // Sync payroll BEFORE setting attendanceSynced=true so Payroll.tsx reads
+      // from a fully-populated localStorage, not an empty one.
       await syncPayrollFromCanister();
+      setAttendanceSynced(true);
       console.log(
         `[AppContext] Attendance synced: ${result.count} records from ${result.source}`,
       );
     } catch (e) {
       console.warn("[AppContext] Attendance sync failed:", e);
+      // Still mark as synced so the UI doesn't hang, but payroll will
+      // handle its own error state when it tries to fetch directly.
       setAttendanceSynced(true);
     }
   }, []);
@@ -141,7 +144,7 @@ export function AppContextProvider({
     const initialize = async () => {
       try {
         await refreshEmployees();
-        await refreshAttendance(); // also awaits payroll sync internally
+        await refreshAttendance(); // awaits both attendance AND payroll sync before setting attendanceSynced=true
       } catch (e) {
         console.warn("[AppContext] Initialization error:", e);
       } finally {
