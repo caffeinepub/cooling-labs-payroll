@@ -51,6 +51,8 @@ export const MODULE_LABELS: Record<string, string> = {
 const COMPANIES_KEY = "hkai_companies";
 const SUPERADMIN_SESSION_KEY = "hkai_superadmin_session";
 const COMPANY_SESSION_KEY = "hkai_company_session";
+// Canister auth service writes to this key — used as fallback when legacy session is absent
+const CANISTER_SESSION_CACHE_KEY = "hkai_canister_company_session";
 const SUPERADMIN_CREDS_KEY = "hkai_superadmin_creds";
 const MIGRATION_FLAG = "hkai_migration_v1";
 
@@ -76,16 +78,29 @@ export function getTenantKey(companyId: string, baseKey: string): string {
   return `clf_${companyId}_${baseKey}`;
 }
 
-/** Get active company ID from session (for use inside storage services) */
+/** Get active company ID from session (for use inside storage services).
+ * Checks the legacy session key first, then falls back to the canister
+ * session cache. This ensures correct scoping even when localLoginCompany
+ * could not write the legacy key (e.g. fresh browser with no local company registry).
+ */
 export function getActiveCompanyId(): string {
+  // 1. Try the legacy session key (written by localLoginCompany on each login)
   try {
     const raw = localStorage.getItem(COMPANY_SESSION_KEY);
-    if (!raw) return "COOLABS";
-    const session: CompanySession = JSON.parse(raw);
-    return session.companyCode || "COOLABS";
-  } catch {
-    return "COOLABS";
-  }
+    if (raw) {
+      const session: CompanySession = JSON.parse(raw);
+      if (session.companyCode) return session.companyCode;
+    }
+  } catch {}
+  // 2. Fall back to the canister session cache (always written by canisterAuthService on login)
+  try {
+    const raw = localStorage.getItem(CANISTER_SESSION_CACHE_KEY);
+    if (raw) {
+      const session = JSON.parse(raw) as { companyCode?: string };
+      if (session.companyCode) return session.companyCode;
+    }
+  } catch {}
+  return "COOLABS";
 }
 
 export function getCompanies(): Company[] {
