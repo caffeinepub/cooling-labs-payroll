@@ -319,21 +319,20 @@ export function Payroll() {
     setLoading(true);
     setPayrollError(null);
     try {
-      // Sync from canister first — populates localStorage with canonical backend data
+      // Sync from canister — populates localStorage with canonical backend data.
+      // We always read from localStorage afterward, so even a partial/empty sync
+      // still shows locally generated data (critical for post-generation display).
       await canisterPayroll.syncPayrollFromCanister();
     } catch (e) {
-      console.error("[Payroll] Canister sync failed:", e);
-      // Show explicit error instead of zero/empty payroll
-      setPayrollError(
-        "Failed to load payroll from backend. Please refresh and try again.",
-      );
-      setLoading(false);
-      return;
+      // Log but don't block — localStorage may already have valid data
+      console.warn("[Payroll] Canister sync failed, reading localStorage:", e);
     }
-    // Now read from localStorage (which is now populated from canister)
-    setBreakdowns(
-      payrollStorage.getPayrollWithBreakdown(BigInt(month), BigInt(year)),
+    // Always read from localStorage regardless of canister sync result
+    const bds = payrollStorage.getPayrollWithBreakdown(
+      BigInt(month),
+      BigInt(year),
     );
+    setBreakdowns(bds);
     setSummary(payrollStorage.getPayrollSummary(BigInt(month), BigInt(year)));
     setLoading(false);
   }, [month, year]);
@@ -361,47 +360,23 @@ export function Payroll() {
           `Generated for ${String(res.generatedCount)} employees`,
           "success",
         );
-        void loadPayroll();
+        // Immediately read from localStorage — generation already saved there.
+        // canister push happens in background; loadPayroll() handles cross-browser sync.
+        setBreakdowns(
+          payrollStorage.getPayrollWithBreakdown(BigInt(month), BigInt(year)),
+        );
+        setSummary(
+          payrollStorage.getPayrollSummary(BigInt(month), BigInt(year)),
+        );
         setOverwriteOpen(false);
-      } catch (err: any) {
-        const msg: string = err?.message ?? "";
-        if (msg.includes("NO_EMPLOYEES")) {
-          addToast(
-            "No employees found for this company. Please add employees first.",
-            "error",
-          );
-        } else if (msg.includes("NO_ATTENDANCE")) {
-          const MONTHS = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-          ];
-          addToast(
-            `No attendance found for ${MONTHS[month - 1]} ${year}. Please enter attendance before generating payroll.`,
-            "error",
-          );
-        } else if (msg.includes("ALREADY_EXISTS")) {
-          addToast(
-            "Payroll already exists for all employees this month. Use Re-generate to overwrite.",
-            "info",
-          );
-        } else {
-          addToast(`Generation failed: ${msg || "Unknown error"}`, "error");
-        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Generation failed";
+        addToast(msg, "error");
       } finally {
         setGenerating(false);
       }
     },
-    [month, year, addToast, loadPayroll],
+    [month, year, addToast],
   );
 
   const handleGenerate = useCallback(() => {

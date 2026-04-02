@@ -4,7 +4,7 @@
  * Tenant-aware payroll backed by ICP canister.
  * Strategy:
  *   - Reads: canister (source of truth), seeded into localStorage as cache.
- *   - Writes: canister first, then localStorage cache updated.
+ *   - Writes: local engine first (immediate UI), then canister in background.
  *   - Migration: if canister is empty and localStorage has data, push all to canister.
  *
  * Uses getAllPayrollByCompany for efficient single-call sync.
@@ -26,10 +26,17 @@ import {
   setPayrollPT,
 } from "./payrollStorage";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
+import { getEmployees } from "./workforceStorage";
 
 /** The localStorage key used by payrollStorage for the active company */
 function payrollLSKey(): string {
   return getTenantKey(getActiveCompanyId(), "clf_payroll");
+}
+
+/** Safe coerce — handles BigInt returned by ICP agent for Nat/Int fields */
+function n(v: unknown): number {
+  if (typeof v === "bigint") return Number(v);
+  return Number(v ?? 0);
 }
 
 /** Convert a PayrollBreakdownExtended to TenantPayrollRecord for canister storage */
@@ -68,41 +75,45 @@ function toTenantRecord(
   };
 }
 
-/** Convert a TenantPayrollRecord from canister to localStorage-compatible raw format */
+/**
+ * Convert a TenantPayrollRecord from canister to localStorage-compatible raw format.
+ * IMPORTANT: ICP agent returns Nat/Int as bigint — ALL numeric fields must go through n()
+ * to avoid JSON.stringify throwing TypeError on bigint values.
+ */
 function toLocalStorageRecord(p: TenantPayrollRecord): object {
   return {
-    id: p.id,
-    employeeId: p.employeeId,
-    month: p.month,
-    year: p.year,
-    basicSalary: p.earnedBasic,
-    hra: p.earnedHra,
-    conveyance: p.earnedConveyance,
-    specialAllowance: p.earnedSpecialAllowance,
-    otherAllowance: p.earnedOtherAllowance,
-    otAmount: p.otPay,
-    grossPay: p.finalGross,
-    pfDeduction: p.pfDeduction,
-    esiDeduction: p.esiDeduction,
-    ptDeduction: p.ptDeduction,
-    advanceDeduction: p.advanceDeduction,
-    otherDeduction: p.otherDeduction,
-    netPay: p.netPay,
-    generatedAt: p.generatedAt,
-    _presentDays: p.presentDays,
-    _halfDays: p.halfDays,
-    _lopDays: p.lopDays,
-    _paidDays: p.paidDays,
-    _otHours: p.otHours,
-    _earnedBasic: p.earnedBasic,
-    _earnedHra: p.earnedHra,
-    _earnedConveyance: p.earnedConveyance,
-    _earnedSpecialAllowance: p.earnedSpecialAllowance,
-    _earnedOtherAllowance: p.earnedOtherAllowance,
-    _earnedGross: p.earnedGross,
-    _otPay: p.otPay,
-    _finalGross: p.finalGross,
-    _totalDaysInMonth: p.totalDaysInMonth,
+    id: String(p.id),
+    employeeId: String(p.employeeId),
+    month: n(p.month),
+    year: n(p.year),
+    basicSalary: n(p.earnedBasic),
+    hra: n(p.earnedHra),
+    conveyance: n(p.earnedConveyance),
+    specialAllowance: n(p.earnedSpecialAllowance),
+    otherAllowance: n(p.earnedOtherAllowance),
+    otAmount: n(p.otPay),
+    grossPay: n(p.finalGross),
+    pfDeduction: n(p.pfDeduction),
+    esiDeduction: n(p.esiDeduction),
+    ptDeduction: n(p.ptDeduction),
+    advanceDeduction: n(p.advanceDeduction),
+    otherDeduction: n(p.otherDeduction),
+    netPay: n(p.netPay),
+    generatedAt: n(p.generatedAt),
+    _presentDays: n(p.presentDays),
+    _halfDays: n(p.halfDays),
+    _lopDays: n(p.lopDays),
+    _paidDays: n(p.paidDays),
+    _otHours: n(p.otHours),
+    _earnedBasic: n(p.earnedBasic),
+    _earnedHra: n(p.earnedHra),
+    _earnedConveyance: n(p.earnedConveyance),
+    _earnedSpecialAllowance: n(p.earnedSpecialAllowance),
+    _earnedOtherAllowance: n(p.earnedOtherAllowance),
+    _earnedGross: n(p.earnedGross),
+    _otPay: n(p.otPay),
+    _finalGross: n(p.finalGross),
+    _totalDaysInMonth: n(p.totalDaysInMonth),
   };
 }
 
@@ -212,14 +223,14 @@ function seedLocalStorageAll(
     );
     window.dispatchEvent(new CustomEvent("clf:payroll-updated"));
   } catch (e) {
-    console.warn("[CanisterPayroll] Failed to seed localStorage:", e);
+    console.error("[CanisterPayroll] Failed to seed localStorage:", e);
   }
 }
 
 /**
  * Generate payroll for a month using local computation engine,
- * then save all generated records to canister.
- * Pre-syncs employees and attendance from canister before generating.
+ * push to canister in background, return immediately from local state.
+ * The UI should read from payrollStorage directly after this call.
  */
 export async function generateAndSavePayroll(
   month: number,
@@ -227,49 +238,74 @@ export async function generateAndSavePayroll(
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
 
-  // Step 1: sync employees and attendance from canister so local engine has fresh data
-  await Promise.all([
-    loadEmployeesFromCanister(),
-    syncAttendanceFromCanister(),
-  ]);
-
-  // Step 2: run local payroll engine (reads from localStorage which is now populated)
-  const result = generatePayroll(BigInt(month), BigInt(year), "admin");
-
-  // Step 3: if no rows were generated, diagnose why and throw a descriptive error
-  if (Number(result.generatedCount) === 0) {
-    const empKey = getTenantKey(companyCode, "clf_employees");
-    let localEmps: any[] = [];
-    try {
-      const raw = localStorage.getItem(empKey);
-      if (raw) localEmps = JSON.parse(raw);
-    } catch {}
-
-    if (localEmps.length === 0) {
-      throw new Error("NO_EMPLOYEES");
-    }
-
-    const attRecords = getAttendanceByMonth(String(month), String(year));
-    if (attRecords.length === 0) {
-      throw new Error("NO_ATTENDANCE");
-    }
-
-    // Employees and attendance exist — payroll already exists for all of them
-    throw new Error("ALREADY_EXISTS");
+  // Pre-sync: ensure employees are loaded from canister
+  const empData = getEmployees();
+  if (empData.activeEmployees.length === 0) {
+    console.log(
+      "[CanisterPayroll] No local employees — syncing from canister...",
+    );
+    await loadEmployeesFromCanister();
+  }
+  const empDataAfter = getEmployees();
+  if (empDataAfter.activeEmployees.length === 0) {
+    throw new Error(
+      "No employees found for this company. Please add employees first.",
+    );
   }
 
-  // Step 4: push generated records to canister
-  await pushMonthToCanister(companyCode, month, year);
+  // Pre-sync: ensure attendance is loaded from canister
+  const attRecords = getAttendanceByMonth(String(month), String(year));
+  if (attRecords.length === 0) {
+    console.log(
+      "[CanisterPayroll] No local attendance — syncing from canister...",
+    );
+    await syncAttendanceFromCanister();
+  }
+  const attAfter = getAttendanceByMonth(String(month), String(year));
+  if (attAfter.length === 0) {
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    throw new Error(
+      `No attendance found for ${monthNames[month - 1]} ${year}. Please enter attendance before generating payroll.`,
+    );
+  }
 
-  // Step 5: re-sync from canister to confirm save worked
-  await syncPayrollFromCanister();
+  // Run local payroll engine — saves to localStorage immediately
+  const result = generatePayroll(BigInt(month), BigInt(year), "admin");
+  const count = Number(result.generatedCount);
+  if (count === 0) {
+    // Check if records already exist (all employees skipped due to existingIds)
+    const existing = getPayrollWithBreakdown(BigInt(month), BigInt(year));
+    if (existing.length > 0) {
+      throw new Error(
+        `Payroll already exists for all ${existing.length} employees this month. Use Re-generate to overwrite.`,
+      );
+    }
+    throw new Error(
+      "Payroll generation produced 0 records. Check that employees have valid salary structures.",
+    );
+  }
 
-  return { generatedCount: Number(result.generatedCount) };
+  // Push to canister in background — UI reads from localStorage immediately
+  void pushMonthToCanister(companyCode, month, year);
+
+  return { generatedCount: count };
 }
 
 /**
  * Overwrite payroll for a month: delete canister records, recompute, save.
- * Pre-syncs employees and attendance from canister before generating.
  */
 export async function overwriteAndSavePayroll(
   month: number,
@@ -277,50 +313,56 @@ export async function overwriteAndSavePayroll(
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
 
-  // Step 1: sync employees and attendance from canister so local engine has fresh data
-  await Promise.all([
-    loadEmployeesFromCanister(),
-    syncAttendanceFromCanister(),
-  ]);
-
-  // Step 2: delete existing canister records for this month
-  try {
-    await backendService.deletePayrollForCompanyAndMonth(
-      companyCode,
-      month,
-      year,
+  // Pre-sync: ensure employees and attendance are loaded from canister
+  const empData = getEmployees();
+  if (empData.activeEmployees.length === 0) {
+    await loadEmployeesFromCanister();
+  }
+  const attRecords = getAttendanceByMonth(String(month), String(year));
+  if (attRecords.length === 0) {
+    await syncAttendanceFromCanister();
+  }
+  const attAfter = getAttendanceByMonth(String(month), String(year));
+  if (attAfter.length === 0) {
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    throw new Error(
+      `No attendance found for ${monthNames[month - 1]} ${year}. Please enter attendance before generating payroll.`,
     );
-  } catch (e) {
-    console.warn("[CanisterPayroll] Delete before overwrite failed:", e);
   }
 
-  // Step 3: overwrite local payroll and push to canister
+  // Delete old canister records for this month (background — don't block)
+  void backendService
+    .deletePayrollForCompanyAndMonth(companyCode, month, year)
+    .catch((e: unknown) =>
+      console.warn("[CanisterPayroll] Delete before overwrite failed:", e),
+    );
+
+  // Run local payroll engine — saves to localStorage immediately
   const result = overwritePayroll(BigInt(month), BigInt(year), "admin");
-
-  if (Number(result.generatedCount) === 0) {
-    const empKey = getTenantKey(companyCode, "clf_employees");
-    let localEmps: any[] = [];
-    try {
-      const raw = localStorage.getItem(empKey);
-      if (raw) localEmps = JSON.parse(raw);
-    } catch {}
-
-    if (localEmps.length === 0) {
-      throw new Error("NO_EMPLOYEES");
-    }
-
-    const attRecords = getAttendanceByMonth(String(month), String(year));
-    if (attRecords.length === 0) {
-      throw new Error("NO_ATTENDANCE");
-    }
-
-    throw new Error("ALREADY_EXISTS");
+  const count = Number(result.generatedCount);
+  if (count === 0) {
+    throw new Error(
+      "Re-generate produced 0 records. Check that employees have valid salary structures and attendance exists for this month.",
+    );
   }
 
-  await pushMonthToCanister(companyCode, month, year);
-  await syncPayrollFromCanister();
+  // Push to canister in background
+  void pushMonthToCanister(companyCode, month, year);
 
-  return { generatedCount: Number(result.generatedCount) };
+  return { generatedCount: count };
 }
 
 /**

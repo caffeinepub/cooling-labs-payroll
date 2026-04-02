@@ -1,7 +1,9 @@
 /**
  * supervisorPermissionsStorage.ts — tenant-aware supervisor permissions.
+ * Writes to canister KV store for cross-browser persistence.
  */
 import type { SupervisorPermissions } from "../types";
+import { pushModuleToCanister } from "./syncAllModulesFromCanister";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getStorageKeys() {
@@ -58,6 +60,7 @@ export function getGlobalDefaults(): SupervisorPermissions {
 
 export function saveGlobalDefaults(p: SupervisorPermissions): void {
   localStorage.setItem(getStorageKeys().global, JSON.stringify(p));
+  pushModuleToCanister("clf_supervisor_permissions_global");
 }
 
 export function getPermissionsForSupervisor(
@@ -84,5 +87,6 @@ export function savePermissionsForSupervisor(
       : {};
     all[phone] = p;
     localStorage.setItem(getStorageKeys().per, JSON.stringify(all));
+    pushModuleToCanister("clf_supervisor_permissions");
   } catch {}
 }

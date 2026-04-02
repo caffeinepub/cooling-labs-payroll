@@ -1,3 +1,4 @@
+import { pushModuleToCanister } from "./syncAllModulesFromCanister";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getKey(): string {
@@ -58,4 +59,5 @@ export function getCompanySettings(): CompanySettings {
 export function saveCompanySettings(s: Partial<CompanySettings>): void {
   const current = getCompanySettings();
   localStorage.setItem(getKey(), JSON.stringify({ ...current, ...s }));
+  pushModuleToCanister("clf_company_settings");
 }

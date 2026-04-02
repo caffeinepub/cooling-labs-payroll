@@ -10,6 +10,7 @@ import { syncAttendanceFromCanister } from "../services/canisterAttendanceServic
 import { loadEmployeesFromCanister } from "../services/canisterEmployeeService";
 import { syncPayrollFromCanister } from "../services/canisterPayrollService";
 import * as mastersStorage from "../services/mastersStorage";
+import { syncAllModulesFromCanister } from "../services/syncAllModulesFromCanister";
 import * as workforceStorage from "../services/workforceStorage";
 import type { Department, Employee, Site, Supervisor, Trade } from "../types";
 import { useAdminAuth } from "./AdminAuthContext";
@@ -143,6 +144,14 @@ export function AppContextProvider({
     // Sequentially await canister calls so data is populated BEFORE loading=false
     const initialize = async () => {
       try {
+        // Sync all localStorage-backed modules from canister first
+        // This ensures masters, settings, approvals, etc. are loaded from backend
+        await syncAllModulesFromCanister();
+        // Now reload masters into state (they were just seeded from canister)
+        refreshTrades();
+        refreshDepartments();
+        refreshSites();
+        void refreshSupervisors();
         await refreshEmployees();
         await refreshAttendance(); // awaits both attendance AND payroll sync before setting attendanceSynced=true
       } catch (e) {

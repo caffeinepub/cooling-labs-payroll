@@ -2,8 +2,10 @@
  * workforceStorage.ts
  * localStorage-backed CRUD for Employees and Supervisors.
  * Tenant-aware: all keys are prefixed with the active company ID.
+ * Supervisors also write to canister KV store for cross-browser persistence.
  */
 import type { Employee, Supervisor } from "../types";
+import { pushModuleToCanister } from "./syncAllModulesFromCanister";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getKeys() {
@@ -41,7 +43,7 @@ function save<T>(key: string, data: T[]): void {
 
 type RawEmployee = Omit<Employee, "createdAt"> & { createdAt: number };
 
-// ── Employees ────────────────────────────────────────────────────────────
+// ── Employees ────────────────────────────────────────────────
 
 export function getEmployees(): {
   allEmployees: Employee[];
@@ -100,7 +102,12 @@ export function getEmployeesBySite(siteId: string): {
   };
 }
 
-// ── Supervisors ──────────────────────────────────────────────────────────
+// ── Supervisors ────────────────────────────────────────────────
+
+function saveSupervisors(data: Supervisor[]): void {
+  save(getKeys().supervisors, data);
+  pushModuleToCanister("clf_supervisors");
+}
 
 export function getSupervisors(): Supervisor[] {
   return load<Supervisor>(getKeys().supervisors);
@@ -112,7 +119,7 @@ export function createSupervisor(sup: Supervisor): boolean {
   if (sup.username && raw.some((s) => s.username === sup.username))
     return false;
   raw.push(sup);
-  save(getKeys().supervisors, raw);
+  saveSupervisors(raw);
   return true;
 }
 
@@ -124,7 +131,7 @@ export function updateSupervisor(
   const idx = raw.findIndex((s) => s.phone === phone);
   if (idx === -1) return false;
   raw[idx] = { ...raw[idx], ...sup, phone };
-  save(getKeys().supervisors, raw);
+  saveSupervisors(raw);
   return true;
 }
 
@@ -132,7 +139,7 @@ export function deleteSupervisor(phone: string): boolean {
   const raw = load<Supervisor>(getKeys().supervisors);
   const filtered = raw.filter((s) => s.phone !== phone);
   if (filtered.length === raw.length) return false;
-  save(getKeys().supervisors, filtered);
+  saveSupervisors(filtered);
   return true;
 }
 

@@ -10,6 +10,7 @@ import {
   updateAttendanceOT,
 } from "./attendanceStorage";
 import { getPayrollWithBreakdown, overwritePayroll } from "./payrollStorage";
+import { pushModuleToCanister } from "./syncAllModulesFromCanister";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getKeys() {
@@ -40,6 +41,7 @@ function loadRequests(): RawRequest[] {
 
 function saveRequests(data: RawRequest[]): void {
   localStorage.setItem(getKeys().requests, JSON.stringify(data));
+  pushModuleToCanister("clf_reg_requests");
 }
 
 function loadLogs(): RawLog[] {
@@ -54,6 +56,7 @@ function loadLogs(): RawLog[] {
 
 function saveLogs(data: RawLog[]): void {
   localStorage.setItem(getKeys().auditLogs, JSON.stringify(data));
+  pushModuleToCanister("clf_audit_logs");
 }
 
 function toRequest(

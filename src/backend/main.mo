@@ -1171,4 +1171,25 @@ persistent actor {
     Array.find(supervisorsV2, func(s : Supervisor) : Bool { s.phone == phone and s.pin == pin and s.active }) != null;
   };
 
+  // ── Tenant Key-Value Store (generic per-company JSON blob storage) ────────────
+  // Used to persist: mastersStorage, companySettings, approvalsStorage,
+  // regularizationStorage, workforceStorage (supervisors), supervisorPermissionsStorage
+
+  type TenantKV = { companyCode : Text; key : Text; value : Text; updatedAt : Int };
+  stable var tenantKV : [TenantKV] = [];
+
+  public func setTenantKV(companyCode : Text, key : Text, value : Text) : async Bool {
+    tenantKV := Array.filter(tenantKV, func(r : TenantKV) : Bool {
+      not (r.companyCode == companyCode and r.key == key)
+    });
+    tenantKV := Array.append(tenantKV, [{ companyCode = companyCode; key = key; value = value; updatedAt = Time.now() }]);
+    true
+  };
+
+  public query func getAllTenantKV(companyCode : Text) : async [(Text, Text)] {
+    let filtered = Array.filter(tenantKV, func(r : TenantKV) : Bool { r.companyCode == companyCode });
+    Array.map<TenantKV, (Text, Text)>(filtered, func(r : TenantKV) : (Text, Text) { (r.key, r.value) })
+  };
+
+
 };

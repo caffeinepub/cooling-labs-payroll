@@ -2,8 +2,10 @@
  * mastersStorage.ts
  * localStorage-backed CRUD for Trade, Department, Site masters.
  * Tenant-aware: all keys are prefixed with the active company ID.
+ * Canister-backed: every write also pushes to the ICP canister KV store.
  */
 import type { Department, Site, Trade } from "../types";
+import { pushModuleToCanister } from "./syncAllModulesFromCanister";
 import { getActiveCompanyId, getTenantKey } from "./tenantStorage";
 
 function getKeys() {
@@ -23,6 +25,7 @@ function getCounter(): number {
 function nextId(): string {
   const c = getCounter() + 1;
   localStorage.setItem(getKeys().counter, String(c));
+  pushModuleToCanister("clf_master_counter");
   return `local-${c}-${Date.now()}`;
 }
 
@@ -36,15 +39,16 @@ function load<T>(key: string): T[] {
   }
 }
 
-function save<T>(key: string, data: T[]): void {
+function save<T>(key: string, baseKey: string, data: T[]): void {
   localStorage.setItem(key, JSON.stringify(data));
+  pushModuleToCanister(baseKey);
 }
 
 function toLower(s: string): string {
   return s.toLowerCase().trim();
 }
 
-// ── Trades ────────────────────────────────────────────────────────────────
+// ── Trades ──────────────────────────────────────────────────────
 
 export function getTrades(): { trades: Trade[]; activeTrades: Trade[] } {
   const raw = load<{
@@ -74,7 +78,7 @@ export function createTrade(name: string): boolean {
     status: "active",
     createdAt: Date.now(),
   });
-  save(getKeys().trades, raw);
+  save(getKeys().trades, "clf_trades", raw);
   return true;
 }
 
@@ -88,11 +92,11 @@ export function updateTrade(id: string, name: string, status: string): boolean {
   const idx = raw.findIndex((t) => t.id === id);
   if (idx === -1) return false;
   raw[idx] = { ...raw[idx], name: name.trim(), status };
-  save(getKeys().trades, raw);
+  save(getKeys().trades, "clf_trades", raw);
   return true;
 }
 
-// ── Departments ───────────────────────────────────────────────────────────
+// ── Departments ────────────────────────────────────────────────
 
 export function getDepartments(): {
   departments: Department[];
@@ -128,7 +132,7 @@ export function createDepartment(name: string): boolean {
     status: "active",
     createdAt: Date.now(),
   });
-  save(getKeys().departments, raw);
+  save(getKeys().departments, "clf_departments", raw);
   return true;
 }
 
@@ -146,11 +150,11 @@ export function updateDepartment(
   const idx = raw.findIndex((d) => d.id === id);
   if (idx === -1) return false;
   raw[idx] = { ...raw[idx], name: name.trim(), status };
-  save(getKeys().departments, raw);
+  save(getKeys().departments, "clf_departments", raw);
   return true;
 }
 
-// ── Sites ─────────────────────────────────────────────────────────────────
+// ── Sites ─────────────────────────────────────────────────────────
 
 type RawSite = {
   id: string;
@@ -192,7 +196,7 @@ export function createSite(
     radiusMeters,
     createdAt: Date.now(),
   });
-  save(getKeys().sites, raw);
+  save(getKeys().sites, "clf_sites", raw);
   return true;
 }
 
@@ -217,6 +221,6 @@ export function updateSite(
     lng,
     radiusMeters,
   };
-  save(getKeys().sites, raw);
+  save(getKeys().sites, "clf_sites", raw);
   return true;
 }

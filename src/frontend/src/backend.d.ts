@@ -3,6 +3,10 @@ export interface Trade {
   name: string;
   status: string;
   createdAt: bigint;
+  // Tenant Key-Value Store (generic per-company data persistence)
+  setTenantKV: (companyCode: string, key: string, value: string) => Promise<boolean>;
+  getAllTenantKV: (companyCode: string) => Promise<Array<[string, string]>>;
+
 }
 
 export interface Department {
@@ -416,4 +420,8 @@ export interface backendInterface {
   addSupervisor: (phone: string, name: string, siteId: string, pin: string) => Promise<boolean>;
   removeSupervisor: (phone: string) => Promise<boolean>;
   verifySupervisorPin: (phone: string, pin: string) => Promise<boolean>;
+  // Tenant Key-Value Store (generic per-company data persistence)
+  setTenantKV: (companyCode: string, key: string, value: string) => Promise<boolean>;
+  getAllTenantKV: (companyCode: string) => Promise<Array<[string, string]>>;
+
 }

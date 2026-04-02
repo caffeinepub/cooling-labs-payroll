@@ -856,6 +856,10 @@ export const idlFactory = ({ IDL }) => {
     addSupervisor: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
     removeSupervisor: IDL.Func([IDL.Text], [IDL.Bool], []),
     verifySupervisorPin: IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], ['query']),
+
+    // ── Tenant KV Store ────────────────────────────────────────────────
+    setTenantKV: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+    getAllTenantKV: IDL.Func([IDL.Text], [IDL.Vec(IDL.Record({'0': IDL.Text, '1': IDL.Text}))], ['query']),
   });
 };
 
