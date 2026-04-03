@@ -59,6 +59,7 @@ export async function syncAttendanceFromCanister(): Promise<{
   source: "canister" | "local";
 }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return { count: 0, source: "local" as const };
   try {
     const raw = (await backendService.getAllAttendanceByCompany(
       companyCode,
@@ -163,6 +164,7 @@ export async function markAttendanceInCanister(
   advanceAmount = 0,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.markAttendanceForCompany(
       companyCode,
@@ -195,6 +197,7 @@ export async function markAttendanceOverwriteInCanister(
   advanceAmount = 0,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.markAttendanceOverwriteForCompany(
       companyCode,
@@ -222,6 +225,7 @@ export async function deleteAttendanceInCanister(
   dateStr: string,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.deleteAttendanceForCompany(
       companyCode,
@@ -238,6 +242,7 @@ export async function bulkMarkAttendanceInCanister(
   source: string,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.bulkMarkAttendanceForCompany(
       companyCode,
@@ -254,6 +259,7 @@ export async function bulkMarkAttendanceOverwriteInCanister(
   source: string,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.bulkMarkAttendanceOverwriteForCompany(
       companyCode,
@@ -275,6 +281,7 @@ export async function updateAttendanceOTInCanister(
   source: string,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.updateAttendanceOTForCompany(
       companyCode,
@@ -295,6 +302,7 @@ export async function updateAttendanceAdvanceInCanister(
   source: string,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.updateAttendanceAdvanceForCompany(
       companyCode,

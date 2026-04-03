@@ -94,6 +94,7 @@ function mapToCanister(emp: Employee, companyCode: string): TenantEmployeeRaw {
  */
 function seedWorkforceStorage(employees: Employee[]): void {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   const key = getTenantKey(companyCode, "clf_employees");
   try {
     const raw = employees.map((e) => ({
@@ -117,6 +118,7 @@ function remapStorageIds(
   localEmployees: Employee[],
 ): void {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
 
   // Build old-ID → new-ID map by matching on employeeId (human code)
   const idMap: Record<string, string> = {};
@@ -181,6 +183,8 @@ export async function loadEmployeesFromCanister(): Promise<{
   source: "canister" | "local";
 }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode)
+    return { allEmployees: [], activeEmployees: [], source: "local" as const };
   try {
     const result = (await backendService.getEmployeesByCompany(
       companyCode,
@@ -272,6 +276,7 @@ export async function createEmployeeInCanister(
   emp: Omit<Employee, "id"> & { id?: string },
 ): Promise<{ success: boolean; source: "canister" | "local" }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return { success: false, source: "local" as const };
   // Always write to localStorage as backup
   const localOk = workforceStorage.createEmployee(emp);
   try {
@@ -300,6 +305,7 @@ export async function updateEmployeeInCanister(
   emp: Partial<Employee>,
 ): Promise<{ success: boolean; source: "canister" | "local" }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return { success: false, source: "local" as const };
   // Always write to localStorage as backup
   const localOk = workforceStorage.updateEmployee(id, emp);
   try {

@@ -398,5 +398,5 @@ export function clearSuperAdminSession(): void {
 
 export function getActiveCompanyCodeFromCanisterSession(): string {
   const session = getCompanySessionCached();
-  return session?.companyCode || "COOLABS";
+  return session?.companyCode || "";
 }

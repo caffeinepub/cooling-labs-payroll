@@ -100,7 +100,7 @@ export function getActiveCompanyId(): string {
       if (session.companyCode) return session.companyCode;
     }
   } catch {}
-  return "COOLABS";
+  return "";
 }
 
 export function getCompanies(): Company[] {

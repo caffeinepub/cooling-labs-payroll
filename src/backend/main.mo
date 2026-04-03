@@ -732,11 +732,13 @@ persistent actor {
 
   // ── Tenant-Aware Employee Methods ──────────────────────────────────────────────
   public query func getEmployeesByCompany(companyCode : Text) : async { allEmployees : [TenantEmployee]; activeEmployees : [TenantEmployee] } {
+    if (companyCode == "") return { allEmployees = []; activeEmployees = [] };
     let filtered = Array.filter(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == companyCode });
     let active = Array.filter(filtered, func(e : TenantEmployee) : Bool { e.status == "active" });
     { allEmployees = filtered; activeEmployees = active };
   };
   public func createEmployeeForCompany(companyCode : Text, emp : TenantEmployee) : async Bool {
+    if (companyCode == "") return false;
     let code = companyCode;
     if (Array.find(tenantEmployees, func(e : TenantEmployee) : Bool { e.companyCode == code and e.employeeId == emp.employeeId }) != null) return false;
     let newId = if (emp.id != "") emp.id else nextId();
@@ -744,6 +746,7 @@ persistent actor {
     tenantEmployees := Array.append(tenantEmployees, [newEmp]); true;
   };
   public func updateEmployeeForCompany(companyCode : Text, id : Text, emp : TenantEmployee) : async Bool {
+    if (companyCode == "") return false;
     let code = companyCode;
     var found = false;
     tenantEmployees := Array.map(tenantEmployees, func(e : TenantEmployee) : TenantEmployee {
@@ -799,10 +802,12 @@ persistent actor {
   // ── Tenant-Aware Attendance Methods ────────────────────────────────────────────
 
   public query func getAllAttendanceByCompany(companyCode : Text) : async [TenantAttendanceRecord] {
+    if (companyCode == "") return [];
     Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool { a.companyCode == companyCode });
   };
 
   public query func getAttendanceByCompanyAndMonth(companyCode : Text, month : Text, year : Text) : async [TenantAttendanceRecord] {
+    if (companyCode == "") return [];
     let mm = if (Text.size(month) == 1) "0" # month else month;
     let prefix = year # mm;
     Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
@@ -815,6 +820,7 @@ persistent actor {
     attStatus : Text, otHours : Float, advanceAmount : Float,
     punchIn : Text, punchOut : Text, lat : Float, lng : Float, source : Text
   ) : async Bool {
+    if (companyCode == "") return false;
     let exists = Array.find(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
       a.companyCode == companyCode and a.employeeId == employeeId and a.date == date
     });
@@ -854,6 +860,7 @@ persistent actor {
   };
 
   public func deleteAttendanceForCompany(companyCode : Text, employeeId : Text, date : Text) : async Bool {
+    if (companyCode == "") return false;
     let before = tenantAttendance.size();
     tenantAttendance := Array.filter(tenantAttendance, func(a : TenantAttendanceRecord) : Bool {
       not (a.companyCode == companyCode and a.employeeId == employeeId and a.date == date)
@@ -1108,18 +1115,21 @@ persistent actor {
   // ── Tenant-Aware Payroll Methods ──────────────────────────────────────────────
 
   public query func getPayrollByCompanyAndMonth(companyCode : Text, month : Nat, year : Nat) : async [TenantPayrollRecord] {
+    if (companyCode == "") return [];
     Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
       p.companyCode == companyCode and p.month == month and p.year == year
     });
   };
 
   public query func getAllPayrollByCompany(companyCode : Text) : async [TenantPayrollRecord] {
+    if (companyCode == "") return [];
     Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
       p.companyCode == companyCode
     });
   };
 
   public func savePayrollForCompany(companyCode : Text, records : [TenantPayrollRecord]) : async Nat {
+    if (companyCode == "") return 0;
     var count : Nat = 0;
     for (rec in records.vals()) {
       tenantPayroll := Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
@@ -1133,6 +1143,7 @@ persistent actor {
   };
 
   public func deletePayrollForCompanyAndMonth(companyCode : Text, month : Nat, year : Nat) : async Nat {
+    if (companyCode == "") return 0;
     let before = tenantPayroll.size();
     tenantPayroll := Array.filter(tenantPayroll, func(p : TenantPayrollRecord) : Bool {
       not (p.companyCode == companyCode and p.month == month and p.year == year)
@@ -1144,6 +1155,7 @@ persistent actor {
     companyCode : Text, employeeId : Text, month : Nat, year : Nat,
     ptDeduction : Float, advanceDeduction : Float, otherDeduction : Float
   ) : async Bool {
+    if (companyCode == "") return false;
     var found = false;
     tenantPayroll := Array.map(tenantPayroll, func(p : TenantPayrollRecord) : TenantPayrollRecord {
       if (p.companyCode == companyCode and p.employeeId == employeeId and p.month == month and p.year == year) {
@@ -1179,6 +1191,7 @@ persistent actor {
   stable var tenantKV : [TenantKV] = [];
 
   public func setTenantKV(companyCode : Text, key : Text, value : Text) : async Bool {
+    if (companyCode == "") return false;
     tenantKV := Array.filter(tenantKV, func(r : TenantKV) : Bool {
       not (r.companyCode == companyCode and r.key == key)
     });
@@ -1187,6 +1200,7 @@ persistent actor {
   };
 
   public query func getAllTenantKV(companyCode : Text) : async [(Text, Text)] {
+    if (companyCode == "") return [];
     let filtered = Array.filter(tenantKV, func(r : TenantKV) : Bool { r.companyCode == companyCode });
     Array.map<TenantKV, (Text, Text)>(filtered, func(r : TenantKV) : (Text, Text) { (r.key, r.value) })
   };

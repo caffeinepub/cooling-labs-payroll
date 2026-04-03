@@ -128,6 +128,7 @@ export async function syncPayrollFromCanister(): Promise<{
   source: "canister" | "local";
 }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return { count: 0, source: "local" as const };
   try {
     // Single call to get ALL payroll for this company (no month-by-month loop)
     const allRecords = (await backendService.getAllPayrollByCompany(
@@ -237,6 +238,7 @@ export async function generateAndSavePayroll(
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) throw new Error("No authenticated company. Please log in.");
 
   // Pre-sync: ensure employees are loaded from canister
   const empData = getEmployees();
@@ -312,6 +314,7 @@ export async function overwriteAndSavePayroll(
   year: number,
 ): Promise<{ generatedCount: number }> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) throw new Error("No authenticated company. Please log in.");
 
   // Pre-sync: ensure employees and attendance are loaded from canister
   const empData = getEmployees();
@@ -397,6 +400,7 @@ export async function saveDeductionToCanister(
   otherDeduction: number,
 ): Promise<void> {
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return;
   try {
     await backendService.updatePayrollDeductionForCompany(
       companyCode,
@@ -509,6 +513,7 @@ export async function manualOverrideAndSync(
     updatedBy,
   );
   const companyCode = getActiveCompanyId();
+  if (!companyCode) return ok;
   await pushMonthToCanister(companyCode, Number(month), Number(year));
   return ok;
 }
