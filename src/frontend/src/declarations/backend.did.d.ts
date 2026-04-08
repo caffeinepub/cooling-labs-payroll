@@ -10,7 +10,554 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface _SERVICE {}
+export interface Advance {
+  'id' : string,
+  'date' : string,
+  'createdAt' : bigint,
+  'site' : string,
+  'employeeId' : string,
+  'amount' : number,
+}
+export interface AttendanceRecord {
+  'id' : string,
+  'lat' : number,
+  'lng' : number,
+  'status' : string,
+  'changedBy' : string,
+  'otHours' : number,
+  'flagReason' : string,
+  'date' : string,
+  'punchOut' : string,
+  'createdAt' : bigint,
+  'regularizationReason' : string,
+  'updatedAt' : bigint,
+  'isRegularized' : boolean,
+  'employeeId' : string,
+  'punchIn' : string,
+  'isFlagged' : boolean,
+}
+export interface AuditLog {
+  'id' : string,
+  'oldValue' : string,
+  'changedBy' : string,
+  'newValue' : string,
+  'entityId' : string,
+  'timestamp' : bigint,
+  'entityType' : string,
+  'reason' : string,
+}
+export interface CompanyFull {
+  'id' : string,
+  'status' : string,
+  'country' : string,
+  'adminPasswordHash' : string,
+  'moduleAccess' : Array<string>,
+  'logoDataUrl' : string,
+  'createdAt' : bigint,
+  'legalName' : string,
+  'adminUsername' : string,
+  'updatedAt' : bigint,
+  'state' : string,
+  'address' : string,
+  'notes' : string,
+  'companyCode' : string,
+  'companyName' : string,
+  'brandName' : string,
+  'planStatus' : string,
+}
+export interface CompanySession {
+  'token' : string,
+  'expiresAt' : bigint,
+  'username' : string,
+  'createdAt' : bigint,
+  'role' : string,
+  'companyCode' : string,
+  'companyName' : string,
+  'siteId' : string,
+  'companyId' : string,
+}
+export interface Department {
+  'id' : string,
+  'status' : string,
+  'name' : string,
+  'createdAt' : bigint,
+}
+export interface Employee {
+  'id' : string,
+  'hra' : number,
+  'status' : string,
+  'pfApplicable' : boolean,
+  'name' : string,
+  'createdAt' : bigint,
+  'site' : string,
+  'otRate' : number,
+  'cityType' : string,
+  'tradeId' : string,
+  'employeeId' : string,
+  'otherAllowance' : number,
+  'salaryMode' : string,
+  'specialAllowance' : number,
+  'mobile' : string,
+  'basicSalary' : number,
+  'esiApplicable' : boolean,
+  'conveyance' : number,
+  'departmentId' : string,
+}
+export interface LoginResult {
+  'token' : string,
+  'role' : string,
+  'companyCode' : string,
+  'companyName' : string,
+  'success' : boolean,
+  'errorMsg' : string,
+}
+export interface PayrollBreakdown {
+  'halfDays' : number,
+  'otHours' : number,
+  'totalDaysInMonth' : bigint,
+  'presentDays' : number,
+  'paidDays' : number,
+  'lopDays' : number,
+  'record' : PayrollRecord,
+}
+export interface PayrollRecord {
+  'id' : string,
+  'hra' : number,
+  'month' : bigint,
+  'generatedAt' : bigint,
+  'year' : bigint,
+  'grossPay' : number,
+  'netPay' : number,
+  'ptDeduction' : number,
+  'employeeId' : string,
+  'otherAllowance' : number,
+  'esiDeduction' : number,
+  'otAmount' : number,
+  'specialAllowance' : number,
+  'basicSalary' : number,
+  'conveyance' : number,
+  'pfDeduction' : number,
+}
+export interface PayrollSummary {
+  'totalEmployees' : bigint,
+  'totalDeductions' : number,
+  'totalNetPay' : number,
+  'totalGross' : number,
+}
+export interface PlatformStats {
+  'totalEmployees' : bigint,
+  'paidCompanies' : bigint,
+  'activeCompanies' : bigint,
+  'inactiveCompanies' : bigint,
+  'totalUsers' : bigint,
+  'suspendedCompanies' : bigint,
+  'trialCompanies' : bigint,
+  'totalCompanies' : bigint,
+}
+export interface RegularizationRequest {
+  'id' : string,
+  'oldStatus' : string,
+  'date' : string,
+  'approvedAt' : bigint,
+  'approvedBy' : string,
+  'createdAt' : bigint,
+  'approvalStatus' : string,
+  'employeeId' : string,
+  'requestedStatus' : string,
+  'requestedBy' : string,
+  'reason' : string,
+}
+export interface Site {
+  'id' : string,
+  'lat' : number,
+  'lng' : number,
+  'status' : string,
+  'name' : string,
+  'createdAt' : bigint,
+  'radiusMeters' : number,
+}
+export interface SuperAdminLoginResult {
+  'token' : string,
+  'success' : boolean,
+  'errorMsg' : string,
+}
+export interface SuperAdminSession {
+  'token' : string,
+  'expiresAt' : bigint,
+  'username' : string,
+  'createdAt' : bigint,
+}
+export interface Supervisor {
+  'pin' : string,
+  'active' : boolean,
+  'name' : string,
+  'siteId' : string,
+  'phone' : string,
+}
+export interface TenantAttendanceRecord {
+  'id' : string,
+  'lat' : number,
+  'lng' : number,
+  'status' : string,
+  'changedBy' : string,
+  'otHours' : number,
+  'flagReason' : string,
+  'date' : string,
+  'punchOut' : string,
+  'createdAt' : bigint,
+  'regularizationReason' : string,
+  'updatedAt' : bigint,
+  'isRegularized' : boolean,
+  'employeeId' : string,
+  'punchIn' : string,
+  'advanceAmount' : number,
+  'companyCode' : string,
+  'isFlagged' : boolean,
+}
+export interface TenantEmployee {
+  'id' : string,
+  'bankAccountNumber' : string,
+  'hra' : number,
+  'status' : string,
+  'pfApplicable' : boolean,
+  'ifscCode' : string,
+  'name' : string,
+  'createdAt' : bigint,
+  'site' : string,
+  'otRate' : number,
+  'cityType' : string,
+  'bankName' : string,
+  'dateOfJoining' : string,
+  'tradeId' : string,
+  'employeeId' : string,
+  'otherAllowance' : number,
+  'companyCode' : string,
+  'bankAccountHolderName' : string,
+  'salaryMode' : string,
+  'branchAddress' : string,
+  'panNumber' : string,
+  'specialAllowance' : number,
+  'mobile' : string,
+  'aadhaarNumber' : string,
+  'uanNumber' : string,
+  'esiNumber' : string,
+  'basicSalary' : number,
+  'esiApplicable' : boolean,
+  'conveyance' : number,
+  'departmentId' : string,
+}
+export interface TenantPayrollRecord {
+  'id' : string,
+  'month' : bigint,
+  'halfDays' : number,
+  'otherDeduction' : number,
+  'otHours' : number,
+  'totalDaysInMonth' : bigint,
+  'otPay' : number,
+  'generatedAt' : bigint,
+  'presentDays' : number,
+  'year' : bigint,
+  'netPay' : number,
+  'ptDeduction' : number,
+  'paidDays' : number,
+  'employeeId' : string,
+  'lopDays' : number,
+  'esiDeduction' : number,
+  'companyCode' : string,
+  'advanceDeduction' : number,
+  'earnedGross' : number,
+  'earnedSpecialAllowance' : number,
+  'earnedOtherAllowance' : number,
+  'earnedHra' : number,
+  'earnedConveyance' : number,
+  'finalGross' : number,
+  'earnedBasic' : number,
+  'pfDeduction' : number,
+}
+export interface TenantSummary {
+  'status' : string,
+  'employeeCount' : bigint,
+  'createdAt' : bigint,
+  'plan' : string,
+  'updatedAt' : bigint,
+  'attendanceCount' : bigint,
+  'payrollCount' : bigint,
+  'modules' : Array<string>,
+}
+export interface Trade {
+  'id' : string,
+  'status' : string,
+  'name' : string,
+  'createdAt' : bigint,
+}
+export interface _SERVICE {
+  'addAdvance' : ActorMethod<[string, number, string, string], boolean>,
+  'addSupervisor' : ActorMethod<[string, string, string, string], boolean>,
+  'approveRegularizationRequest' : ActorMethod<[string, string], boolean>,
+  'bulkMarkAttendance' : ActorMethod<
+    [Array<[string, string, string, number]>, string],
+    {
+      'errors' : Array<string>,
+      'successCount' : bigint,
+      'skippedCount' : bigint,
+    }
+  >,
+  'bulkMarkAttendanceForCompany' : ActorMethod<
+    [string, Array<[string, string, string, number]>, string],
+    {
+      'errors' : Array<string>,
+      'successCount' : bigint,
+      'skippedCount' : bigint,
+    }
+  >,
+  'bulkMarkAttendanceOverwriteForCompany' : ActorMethod<
+    [string, Array<[string, string, string, number]>, string],
+    {
+      'errors' : Array<string>,
+      'successCount' : bigint,
+      'skippedCount' : bigint,
+    }
+  >,
+  'changeSuperAdminPassword' : ActorMethod<[string, string], boolean>,
+  'createCompany' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      Array<string>,
+      string,
+    ],
+    { 'success' : boolean, 'errorMsg' : string }
+  >,
+  'createDepartment' : ActorMethod<[string], boolean>,
+  'createEmployee' : ActorMethod<[Employee], boolean>,
+  'createEmployeeForCompany' : ActorMethod<[string, TenantEmployee], boolean>,
+  'createRegularizationRequest' : ActorMethod<
+    [string, string, string, string, string, string],
+    boolean
+  >,
+  'createSite' : ActorMethod<[string, number, number, number], boolean>,
+  'createTrade' : ActorMethod<[string], boolean>,
+  'deleteAttendanceForCompany' : ActorMethod<[string, string, string], boolean>,
+  'deletePayrollForCompanyAndMonth' : ActorMethod<
+    [string, bigint, bigint],
+    bigint
+  >,
+  'ensureCompaniesBootstrapped' : ActorMethod<[], bigint>,
+  'flagAttendance' : ActorMethod<[string, string], boolean>,
+  'flagAttendanceForCompany' : ActorMethod<[string, string, string], boolean>,
+  'generatePayroll' : ActorMethod<
+    [bigint, bigint, string],
+    { 'generatedCount' : bigint }
+  >,
+  'getAdvancesByEmployee' : ActorMethod<[string], Array<Advance>>,
+  'getAllAttendance' : ActorMethod<[], Array<AttendanceRecord>>,
+  'getAllAttendanceByCompany' : ActorMethod<
+    [string],
+    Array<TenantAttendanceRecord>
+  >,
+  'getAllPayrollByCompany' : ActorMethod<[string], Array<TenantPayrollRecord>>,
+  'getAllTenantKV' : ActorMethod<[string], Array<[string, string]>>,
+  'getAttendanceByCompanyAndMonth' : ActorMethod<
+    [string, string, string],
+    Array<TenantAttendanceRecord>
+  >,
+  'getAttendanceByMonth' : ActorMethod<
+    [string, string],
+    Array<AttendanceRecord>
+  >,
+  'getAttendanceBySite' : ActorMethod<
+    [string, string, string],
+    Array<AttendanceRecord>
+  >,
+  'getAuditLogs' : ActorMethod<[], Array<AuditLog>>,
+  'getCompanies' : ActorMethod<[], Array<CompanyFull>>,
+  'getCompaniesUpdate' : ActorMethod<[], Array<CompanyFull>>,
+  'getCompanyByCode' : ActorMethod<[string], [] | [CompanyFull]>,
+  'getDepartments' : ActorMethod<
+    [],
+    {
+      'activeDepartments' : Array<Department>,
+      'departments' : Array<Department>,
+    }
+  >,
+  'getEmployees' : ActorMethod<
+    [],
+    { 'allEmployees' : Array<Employee>, 'activeEmployees' : Array<Employee> }
+  >,
+  'getEmployeesByCompany' : ActorMethod<
+    [string],
+    {
+      'allEmployees' : Array<TenantEmployee>,
+      'activeEmployees' : Array<TenantEmployee>,
+    }
+  >,
+  'getEmployeesBySite' : ActorMethod<
+    [string],
+    { 'allEmployees' : Array<Employee>, 'activeEmployees' : Array<Employee> }
+  >,
+  'getPayrollByCompanyAndMonth' : ActorMethod<
+    [string, bigint, bigint],
+    Array<TenantPayrollRecord>
+  >,
+  'getPayrollByMonth' : ActorMethod<[bigint, bigint], Array<PayrollRecord>>,
+  'getPayrollBySite' : ActorMethod<
+    [string, bigint, bigint],
+    Array<PayrollRecord>
+  >,
+  'getPayrollSummary' : ActorMethod<[bigint, bigint], PayrollSummary>,
+  'getPayrollWithBreakdown' : ActorMethod<
+    [bigint, bigint],
+    Array<PayrollBreakdown>
+  >,
+  'getPlatformStats' : ActorMethod<[], PlatformStats>,
+  'getRegularizationRequests' : ActorMethod<[], Array<RegularizationRequest>>,
+  'getSites' : ActorMethod<
+    [],
+    { 'sites' : Array<Site>, 'activeSites' : Array<Site> }
+  >,
+  'getSupervisors' : ActorMethod<[], Array<Supervisor>>,
+  'getTenantSummary' : ActorMethod<[string], TenantSummary>,
+  'getTrades' : ActorMethod<
+    [],
+    { 'trades' : Array<Trade>, 'activeTrades' : Array<Trade> }
+  >,
+  'isCallerAdmin' : ActorMethod<[], boolean>,
+  'loginCompany' : ActorMethod<[string, string, string], LoginResult>,
+  'loginSuperAdmin' : ActorMethod<[string, string], SuperAdminLoginResult>,
+  'logoutCompanySession' : ActorMethod<[string], boolean>,
+  'logoutSuperAdminSession' : ActorMethod<[string], boolean>,
+  'manualOverridePayroll' : ActorMethod<
+    [
+      string,
+      bigint,
+      bigint,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      string,
+    ],
+    boolean
+  >,
+  'markAttendance' : ActorMethod<
+    [string, string, string, number, string, string, number, number, string],
+    boolean
+  >,
+  'markAttendanceForCompany' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      string,
+      number,
+      number,
+      string,
+      string,
+      number,
+      number,
+      string,
+    ],
+    boolean
+  >,
+  'markAttendanceOverwriteForCompany' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      string,
+      number,
+      number,
+      string,
+      string,
+      number,
+      number,
+      string,
+    ],
+    undefined
+  >,
+  'overwritePayroll' : ActorMethod<
+    [bigint, bigint, string],
+    { 'generatedCount' : bigint }
+  >,
+  'regularizeAttendance' : ActorMethod<
+    [string, string, number, string, string],
+    boolean
+  >,
+  'regularizeAttendanceForCompany' : ActorMethod<
+    [string, string, string, number, string, string],
+    boolean
+  >,
+  'rejectRegularizationRequest' : ActorMethod<[string, string], boolean>,
+  'removeSupervisor' : ActorMethod<[string], boolean>,
+  'savePayrollForCompany' : ActorMethod<
+    [string, Array<TenantPayrollRecord>],
+    bigint
+  >,
+  'setAdminPassword' : ActorMethod<[string, string], boolean>,
+  'setPayrollPT' : ActorMethod<[string, bigint, bigint, number], boolean>,
+  'setTenantKV' : ActorMethod<[string, string, string], boolean>,
+  'updateAttendanceAdvanceForCompany' : ActorMethod<
+    [string, string, string, number, string],
+    boolean
+  >,
+  'updateAttendanceOT' : ActorMethod<[string, string, number, string], boolean>,
+  'updateAttendanceOTForCompany' : ActorMethod<
+    [string, string, string, number, string],
+    boolean
+  >,
+  'updateCompany' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      Array<string>,
+      string,
+      string,
+    ],
+    boolean
+  >,
+  'updateCompanyAdminPassword' : ActorMethod<[string, string], boolean>,
+  'updateCompanyStatus' : ActorMethod<[string, string], boolean>,
+  'updateDepartment' : ActorMethod<[string, string, string], boolean>,
+  'updateEmployee' : ActorMethod<[string, Employee], boolean>,
+  'updateEmployeeForCompany' : ActorMethod<
+    [string, string, TenantEmployee],
+    boolean
+  >,
+  'updatePayrollDeductionForCompany' : ActorMethod<
+    [string, string, bigint, bigint, number, number, number],
+    boolean
+  >,
+  'updateSite' : ActorMethod<
+    [string, string, string, number, number, number],
+    boolean
+  >,
+  'updateTrade' : ActorMethod<[string, string, string], boolean>,
+  'validateCompanySession' : ActorMethod<[string], [] | [CompanySession]>,
+  'validateSuperAdminSession' : ActorMethod<[string], [] | [SuperAdminSession]>,
+  'verifyAdminPassword' : ActorMethod<[string], boolean>,
+  'verifySupervisorPin' : ActorMethod<[string, string], boolean>,
+}
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;

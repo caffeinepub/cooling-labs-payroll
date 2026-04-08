@@ -58,6 +58,8 @@ const EMPTY_EMP: Employee = {
   bankName: "",
   branchAddress: "",
   dateOfJoining: "",
+  date_of_birth: "",
+  work_email: "",
   createdAt: BigInt(0),
 };
 
@@ -178,6 +180,18 @@ export function Employees() {
       !/^[a-zA-Z0-9]+$/.test(editing.bankAccountNumber)
     )
       errs.bankAccountNumber = "Account number should be alphanumeric";
+    if (
+      editing.work_email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editing.work_email)
+    )
+      errs.work_email = "Enter a valid email address";
+    if (editing.date_of_birth) {
+      const dob = new Date(editing.date_of_birth);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dob > today)
+        errs.date_of_birth = "Date of Birth cannot be a future date";
+    }
     return errs;
   }, [editing]);
 
@@ -517,6 +531,24 @@ export function Employees() {
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="emp-work-email">Work Email</Label>
+                  <Input
+                    id="emp-work-email"
+                    type="email"
+                    value={editing.work_email || ""}
+                    onChange={(e) =>
+                      setEditing((p) => ({ ...p, work_email: e.target.value }))
+                    }
+                    placeholder="e.g. employee@company.com"
+                    className={formErrors.work_email ? "border-red-400" : ""}
+                  />
+                  {formErrors.work_email && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.work_email}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="emp-doj">Date of Joining</Label>
                   <Input
                     id="emp-doj"
@@ -529,6 +561,51 @@ export function Employees() {
                       }))
                     }
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="emp-dob">Date of Birth</Label>
+                  <Input
+                    id="emp-dob"
+                    type="date"
+                    value={editing.date_of_birth || ""}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditing((p) => ({ ...p, date_of_birth: val }));
+                    }}
+                    className={formErrors.date_of_birth ? "border-red-400" : ""}
+                  />
+                  {formErrors.date_of_birth && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.date_of_birth}
+                    </p>
+                  )}
+                  {editing.date_of_birth &&
+                    !formErrors.date_of_birth &&
+                    (() => {
+                      const dob = new Date(editing.date_of_birth);
+                      const now = new Date();
+                      let years = now.getFullYear() - dob.getFullYear();
+                      let months = now.getMonth() - dob.getMonth();
+                      let days = now.getDate() - dob.getDate();
+                      if (days < 0) {
+                        months -= 1;
+                        days += new Date(
+                          now.getFullYear(),
+                          now.getMonth(),
+                          0,
+                        ).getDate();
+                      }
+                      if (months < 0) {
+                        years -= 1;
+                        months += 12;
+                      }
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          {years} Years, {months} Months, {days} Days
+                        </p>
+                      );
+                    })()}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="emp-status">Status</Label>

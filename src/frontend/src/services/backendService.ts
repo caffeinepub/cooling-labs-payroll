@@ -1,4 +1,5 @@
-import { createActorWithConfig } from "../config";
+import { createActorWithConfig } from "@caffeineai/core-infrastructure";
+import { createActor } from "../backend";
 
 // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch
 type Actor = Record<string, (...args: any[]) => Promise<any>>;
@@ -9,7 +10,7 @@ let actorPromise: Promise<Actor> | null = null;
 export async function getActor(): Promise<Actor> {
   if (actorInstance) return actorInstance;
   if (actorPromise) return actorPromise;
-  actorPromise = createActorWithConfig().then((wrapper) => {
+  actorPromise = createActorWithConfig(createActor).then((wrapper) => {
     // The Backend class wraps the raw ICP actor at `wrapper.actor`.
     // The raw actor has all the IDL-defined methods.
     // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch

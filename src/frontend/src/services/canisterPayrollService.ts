@@ -10,7 +10,7 @@
  * Uses getAllPayrollByCompany for efficient single-call sync.
  */
 
-import type { TenantPayrollRecord } from "../backend.d";
+import type { TenantPayrollRecord } from "../types";
 import { getAttendanceByMonth } from "./attendanceStorage";
 import { backendService } from "./backendService";
 import { syncAttendanceFromCanister } from "./canisterAttendanceService";

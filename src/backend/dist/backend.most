@@ -1,0 +1,347 @@
+// Version: 1.0.0
+type Advance__407634558 =
+  {
+    amount : Float;
+    createdAt : Int;
+    date : Text;
+    employeeId : Text;
+    id : Text;
+    site : Text
+  };
+type AttendanceRecordV1__689493097 =
+  {
+    changedBy : Text;
+    createdAt : Int;
+    date : Text;
+    employeeId : Text;
+    id : Text;
+    isRegularized : Bool;
+    otHours : Float;
+    regularizationReason : Text;
+    status : Text;
+    updatedAt : Int
+  };
+type AttendanceRecord__852829031 =
+  {
+    changedBy : Text;
+    createdAt : Int;
+    date : Text;
+    employeeId : Text;
+    flagReason : Text;
+    id : Text;
+    isFlagged : Bool;
+    isRegularized : Bool;
+    lat : Float;
+    lng : Float;
+    otHours : Float;
+    punchIn : Text;
+    punchOut : Text;
+    regularizationReason : Text;
+    status : Text;
+    updatedAt : Int
+  };
+type AuditLog__6242273 =
+  {
+    changedBy : Text;
+    entityId : Text;
+    entityType : Text;
+    id : Text;
+    newValue : Text;
+    oldValue : Text;
+    reason : Text;
+    timestamp : Int
+  };
+type CompanyFull__915318049 =
+  {
+    address : Text;
+    adminPasswordHash : Text;
+    adminUsername : Text;
+    brandName : Text;
+    companyCode : Text;
+    companyName : Text;
+    country : Text;
+    createdAt : Int;
+    id : Text;
+    legalName : Text;
+    logoDataUrl : Text;
+    moduleAccess : [Text];
+    notes : Text;
+    planStatus : Text;
+    state : Text;
+    status : Text;
+    updatedAt : Int
+  };
+type CompanySession__1069733417 =
+  {
+    companyCode : Text;
+    companyId : Text;
+    companyName : Text;
+    createdAt : Int;
+    expiresAt : Int;
+    role : Text;
+    siteId : Text;
+    token : Text;
+    username : Text
+  };
+type Company__441174571 =
+  {
+    address : Text;
+    adminPasswordHash : Text;
+    adminUsername : Text;
+    brandName : Text;
+    companyCode : Text;
+    companyName : Text;
+    country : Text;
+    createdAt : Int;
+    id : Text;
+    legalName : Text;
+    logoDataUrl : Text;
+    moduleAccess : [Text];
+    planStatus : Text;
+    state : Text;
+    status : Text
+  };
+type Department__1001924832 =
+  {createdAt : Int; id : Text; name : Text; status : Text};
+type EmployeeV1__384843183 =
+  {
+    basicSalary : Float;
+    createdAt : Int;
+    departmentId : Text;
+    employeeId : Text;
+    esiApplicable : Bool;
+    id : Text;
+    mobile : Text;
+    name : Text;
+    otRate : Float;
+    pfApplicable : Bool;
+    site : Text;
+    status : Text;
+    tradeId : Text
+  };
+type Employee__476045079 =
+  {
+    basicSalary : Float;
+    cityType : Text;
+    conveyance : Float;
+    createdAt : Int;
+    departmentId : Text;
+    employeeId : Text;
+    esiApplicable : Bool;
+    hra : Float;
+    id : Text;
+    mobile : Text;
+    name : Text;
+    otRate : Float;
+    otherAllowance : Float;
+    pfApplicable : Bool;
+    salaryMode : Text;
+    site : Text;
+    specialAllowance : Float;
+    status : Text;
+    tradeId : Text
+  };
+type PayrollRecordV1__12971532 =
+  {
+    basicSalary : Float;
+    employeeId : Text;
+    esiDeduction : Float;
+    generatedAt : Int;
+    grossPay : Float;
+    id : Text;
+    month : Nat;
+    netPay : Float;
+    otAmount : Float;
+    pfDeduction : Float;
+    year : Nat
+  };
+type PayrollRecordV2__1037488716 =
+  {
+    basicSalary : Float;
+    conveyance : Float;
+    employeeId : Text;
+    esiDeduction : Float;
+    generatedAt : Int;
+    grossPay : Float;
+    hra : Float;
+    id : Text;
+    month : Nat;
+    netPay : Float;
+    otAmount : Float;
+    otherAllowance : Float;
+    pfDeduction : Float;
+    specialAllowance : Float;
+    year : Nat
+  };
+type PayrollRecord__478220478 =
+  {
+    basicSalary : Float;
+    conveyance : Float;
+    employeeId : Text;
+    esiDeduction : Float;
+    generatedAt : Int;
+    grossPay : Float;
+    hra : Float;
+    id : Text;
+    month : Nat;
+    netPay : Float;
+    otAmount : Float;
+    otherAllowance : Float;
+    pfDeduction : Float;
+    ptDeduction : Float;
+    specialAllowance : Float;
+    year : Nat
+  };
+type RegularizationRequest__306531979 =
+  {
+    approvalStatus : Text;
+    approvedAt : Int;
+    approvedBy : Text;
+    createdAt : Int;
+    date : Text;
+    employeeId : Text;
+    id : Text;
+    oldStatus : Text;
+    reason : Text;
+    requestedBy : Text;
+    requestedStatus : Text
+  };
+type SiteV1__423073599 =
+  {createdAt : Int; id : Text; name : Text; status : Text};
+type Site__895105013 =
+  {
+    createdAt : Int;
+    id : Text;
+    lat : Float;
+    lng : Float;
+    name : Text;
+    radiusMeters : Float;
+    status : Text
+  };
+type SuperAdminSession__705490226 =
+  {createdAt : Int; expiresAt : Int; token : Text; username : Text};
+type SupervisorV1__18158032 =
+  {active : Bool; name : Text; phone : Text; siteId : Text};
+type Supervisor__729592471 =
+  {active : Bool; name : Text; phone : Text; pin : Text; siteId : Text};
+type TenantAttendanceRecord__131699422 =
+  {
+    advanceAmount : Float;
+    changedBy : Text;
+    companyCode : Text;
+    createdAt : Int;
+    date : Text;
+    employeeId : Text;
+    flagReason : Text;
+    id : Text;
+    isFlagged : Bool;
+    isRegularized : Bool;
+    lat : Float;
+    lng : Float;
+    otHours : Float;
+    punchIn : Text;
+    punchOut : Text;
+    regularizationReason : Text;
+    status : Text;
+    updatedAt : Int
+  };
+type TenantEmployee__604374768 =
+  {
+    aadhaarNumber : Text;
+    bankAccountHolderName : Text;
+    bankAccountNumber : Text;
+    bankName : Text;
+    basicSalary : Float;
+    branchAddress : Text;
+    cityType : Text;
+    companyCode : Text;
+    conveyance : Float;
+    createdAt : Int;
+    dateOfJoining : Text;
+    departmentId : Text;
+    employeeId : Text;
+    esiApplicable : Bool;
+    esiNumber : Text;
+    hra : Float;
+    id : Text;
+    ifscCode : Text;
+    mobile : Text;
+    name : Text;
+    otRate : Float;
+    otherAllowance : Float;
+    panNumber : Text;
+    pfApplicable : Bool;
+    salaryMode : Text;
+    site : Text;
+    specialAllowance : Float;
+    status : Text;
+    tradeId : Text;
+    uanNumber : Text
+  };
+type TenantKV__766017241 =
+  {companyCode : Text; key : Text; updatedAt : Int; value : Text};
+type TenantPayrollRecord__247630459 =
+  {
+    advanceDeduction : Float;
+    companyCode : Text;
+    earnedBasic : Float;
+    earnedConveyance : Float;
+    earnedGross : Float;
+    earnedHra : Float;
+    earnedOtherAllowance : Float;
+    earnedSpecialAllowance : Float;
+    employeeId : Text;
+    esiDeduction : Float;
+    finalGross : Float;
+    generatedAt : Int;
+    halfDays : Float;
+    id : Text;
+    lopDays : Float;
+    month : Nat;
+    netPay : Float;
+    otHours : Float;
+    otPay : Float;
+    otherDeduction : Float;
+    paidDays : Float;
+    pfDeduction : Float;
+    presentDays : Float;
+    ptDeduction : Float;
+    totalDaysInMonth : Nat;
+    year : Nat
+  };
+type Trade__711108367 =
+  {createdAt : Int; id : Text; name : Text; status : Text};
+actor {
+  stable SESSION_TTL_NS : Int;
+  stable var adminPasswordHash : Text;
+  stable var advances : [Advance__407634558];
+  stable var attendance : [AttendanceRecordV1__689493097];
+  stable var attendanceV2 : [AttendanceRecord__852829031];
+  stable var auditLogs : [AuditLog__6242273];
+  stable var companies : [Company__441174571];
+  stable var companiesBootstrapped : Bool;
+  stable var companiesFull : [CompanyFull__915318049];
+  stable var companySessions : [CompanySession__1069733417];
+  stable var counter : Nat;
+  stable var departments : [Department__1001924832];
+  stable var employees : [EmployeeV1__384843183];
+  stable var employeesV2 : [Employee__476045079];
+  stable var fullCompaniesBootstrapped : Bool;
+  stable var migrated : Bool;
+  stable var migratedPayrollV3 : Bool;
+  stable var payroll : [PayrollRecordV1__12971532];
+  stable var payrollV2 : [PayrollRecordV2__1037488716];
+  stable var payrollV3 : [PayrollRecord__478220478];
+  stable var regularizationRequests : [RegularizationRequest__306531979];
+  stable var sites : [SiteV1__423073599];
+  stable var sitesV2 : [Site__895105013];
+  stable var superAdminPassword : Text;
+  stable var superAdminSessions : [SuperAdminSession__705490226];
+  stable var supervisors : [SupervisorV1__18158032];
+  stable var supervisorsV2 : [Supervisor__729592471];
+  stable var tenantAttendance : [TenantAttendanceRecord__131699422];
+  stable var tenantEmployees : [TenantEmployee__604374768];
+  stable var tenantKV : [TenantKV__766017241];
+  stable var tenantPayroll : [TenantPayrollRecord__247630459];
+  stable var trades : [Trade__711108367]
+};
