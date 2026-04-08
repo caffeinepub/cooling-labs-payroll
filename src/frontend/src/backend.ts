@@ -89,10 +89,1589 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface backendInterface {
+export interface Advance {
+    id: string;
+    date: string;
+    createdAt: bigint;
+    site: string;
+    employeeId: string;
+    amount: number;
 }
+export interface AuditLog {
+    id: string;
+    oldValue: string;
+    changedBy: string;
+    newValue: string;
+    entityId: string;
+    timestamp: bigint;
+    entityType: string;
+    reason: string;
+}
+export interface SuperAdminSession {
+    token: string;
+    expiresAt: bigint;
+    username: string;
+    createdAt: bigint;
+}
+export interface TenantEmployee {
+    id: string;
+    bankAccountNumber: string;
+    hra: number;
+    status: string;
+    pfApplicable: boolean;
+    ifscCode: string;
+    name: string;
+    createdAt: bigint;
+    site: string;
+    otRate: number;
+    cityType: string;
+    bankName: string;
+    dateOfJoining: string;
+    tradeId: string;
+    employeeId: string;
+    otherAllowance: number;
+    companyCode: string;
+    bankAccountHolderName: string;
+    salaryMode: string;
+    branchAddress: string;
+    panNumber: string;
+    specialAllowance: number;
+    mobile: string;
+    aadhaarNumber: string;
+    uanNumber: string;
+    esiNumber: string;
+    basicSalary: number;
+    esiApplicable: boolean;
+    conveyance: number;
+    departmentId: string;
+}
+export interface CompanyFull {
+    id: string;
+    status: string;
+    country: string;
+    adminPasswordHash: string;
+    moduleAccess: Array<string>;
+    logoDataUrl: string;
+    createdAt: bigint;
+    legalName: string;
+    adminUsername: string;
+    updatedAt: bigint;
+    state: string;
+    address: string;
+    notes: string;
+    companyCode: string;
+    companyName: string;
+    brandName: string;
+    planStatus: string;
+}
+export interface Supervisor {
+    pin: string;
+    active: boolean;
+    name: string;
+    siteId: string;
+    phone: string;
+}
+export interface Trade {
+    id: string;
+    status: string;
+    name: string;
+    createdAt: bigint;
+}
+export interface SuperAdminLoginResult {
+    token: string;
+    success: boolean;
+    errorMsg: string;
+}
+export interface RegularizationRequest {
+    id: string;
+    oldStatus: string;
+    date: string;
+    approvedAt: bigint;
+    approvedBy: string;
+    createdAt: bigint;
+    approvalStatus: string;
+    employeeId: string;
+    requestedStatus: string;
+    requestedBy: string;
+    reason: string;
+}
+export interface PayrollRecord {
+    id: string;
+    hra: number;
+    month: bigint;
+    generatedAt: bigint;
+    year: bigint;
+    grossPay: number;
+    netPay: number;
+    ptDeduction: number;
+    employeeId: string;
+    otherAllowance: number;
+    esiDeduction: number;
+    otAmount: number;
+    specialAllowance: number;
+    basicSalary: number;
+    conveyance: number;
+    pfDeduction: number;
+}
+export interface PayrollSummary {
+    totalEmployees: bigint;
+    totalDeductions: number;
+    totalNetPay: number;
+    totalGross: number;
+}
+export interface Department {
+    id: string;
+    status: string;
+    name: string;
+    createdAt: bigint;
+}
+export interface TenantPayrollRecord {
+    id: string;
+    month: bigint;
+    halfDays: number;
+    otherDeduction: number;
+    otHours: number;
+    totalDaysInMonth: bigint;
+    otPay: number;
+    generatedAt: bigint;
+    presentDays: number;
+    year: bigint;
+    netPay: number;
+    ptDeduction: number;
+    paidDays: number;
+    employeeId: string;
+    lopDays: number;
+    esiDeduction: number;
+    companyCode: string;
+    advanceDeduction: number;
+    earnedGross: number;
+    earnedSpecialAllowance: number;
+    earnedOtherAllowance: number;
+    earnedHra: number;
+    earnedConveyance: number;
+    finalGross: number;
+    earnedBasic: number;
+    pfDeduction: number;
+}
+export interface Site {
+    id: string;
+    lat: number;
+    lng: number;
+    status: string;
+    name: string;
+    createdAt: bigint;
+    radiusMeters: number;
+}
+export interface CompanySession {
+    token: string;
+    expiresAt: bigint;
+    username: string;
+    createdAt: bigint;
+    role: string;
+    companyCode: string;
+    companyName: string;
+    siteId: string;
+    companyId: string;
+}
+export interface TenantAttendanceRecord {
+    id: string;
+    lat: number;
+    lng: number;
+    status: string;
+    changedBy: string;
+    otHours: number;
+    flagReason: string;
+    date: string;
+    punchOut: string;
+    createdAt: bigint;
+    regularizationReason: string;
+    updatedAt: bigint;
+    isRegularized: boolean;
+    employeeId: string;
+    punchIn: string;
+    advanceAmount: number;
+    companyCode: string;
+    isFlagged: boolean;
+}
+export interface PayrollBreakdown {
+    halfDays: number;
+    otHours: number;
+    totalDaysInMonth: bigint;
+    presentDays: number;
+    paidDays: number;
+    lopDays: number;
+    record: PayrollRecord;
+}
+export interface LoginResult {
+    token: string;
+    role: string;
+    companyCode: string;
+    companyName: string;
+    success: boolean;
+    errorMsg: string;
+}
+export interface PlatformStats {
+    totalEmployees: bigint;
+    paidCompanies: bigint;
+    activeCompanies: bigint;
+    inactiveCompanies: bigint;
+    totalUsers: bigint;
+    suspendedCompanies: bigint;
+    trialCompanies: bigint;
+    totalCompanies: bigint;
+}
+export interface TenantSummary {
+    status: string;
+    employeeCount: bigint;
+    createdAt: bigint;
+    plan: string;
+    updatedAt: bigint;
+    attendanceCount: bigint;
+    payrollCount: bigint;
+    modules: Array<string>;
+}
+export interface Employee {
+    id: string;
+    hra: number;
+    status: string;
+    pfApplicable: boolean;
+    name: string;
+    createdAt: bigint;
+    site: string;
+    otRate: number;
+    cityType: string;
+    tradeId: string;
+    employeeId: string;
+    otherAllowance: number;
+    salaryMode: string;
+    specialAllowance: number;
+    mobile: string;
+    basicSalary: number;
+    esiApplicable: boolean;
+    conveyance: number;
+    departmentId: string;
+}
+export interface AttendanceRecord {
+    id: string;
+    lat: number;
+    lng: number;
+    status: string;
+    changedBy: string;
+    otHours: number;
+    flagReason: string;
+    date: string;
+    punchOut: string;
+    createdAt: bigint;
+    regularizationReason: string;
+    updatedAt: bigint;
+    isRegularized: boolean;
+    employeeId: string;
+    punchIn: string;
+    isFlagged: boolean;
+}
+export interface backendInterface {
+    addAdvance(employeeId: string, amount: number, date: string, site: string): Promise<boolean>;
+    addSupervisor(phone: string, name: string, siteId: string, pin: string): Promise<boolean>;
+    approveRegularizationRequest(id: string, approvedBy: string): Promise<boolean>;
+    bulkMarkAttendance(records: Array<[string, string, string, number]>, source: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }>;
+    bulkMarkAttendanceForCompany(companyCode: string, records: Array<[string, string, string, number]>, source: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }>;
+    bulkMarkAttendanceOverwriteForCompany(companyCode: string, records: Array<[string, string, string, number]>, source: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }>;
+    changeSuperAdminPassword(currentPassword: string, newPassword: string): Promise<boolean>;
+    createCompany(companyCode: string, companyName: string, legalName: string, brandName: string, address: string, state: string, country: string, adminUsername: string, adminPassword: string, planStatus: string, moduleAccess: Array<string>, logoDataUrl: string): Promise<{
+        success: boolean;
+        errorMsg: string;
+    }>;
+    createDepartment(name: string): Promise<boolean>;
+    createEmployee(emp: Employee): Promise<boolean>;
+    createEmployeeForCompany(companyCode: string, emp: TenantEmployee): Promise<boolean>;
+    createRegularizationRequest(employeeId: string, date: string, oldStatus: string, requestedStatus: string, reason: string, requestedBy: string): Promise<boolean>;
+    createSite(name: string, lat: number, lng: number, radiusMeters: number): Promise<boolean>;
+    createTrade(name: string): Promise<boolean>;
+    deleteAttendanceForCompany(companyCode: string, employeeId: string, date: string): Promise<boolean>;
+    deletePayrollForCompanyAndMonth(companyCode: string, month: bigint, year: bigint): Promise<bigint>;
+    ensureCompaniesBootstrapped(): Promise<bigint>;
+    flagAttendance(id: string, reason: string): Promise<boolean>;
+    flagAttendanceForCompany(companyCode: string, id: string, reason: string): Promise<boolean>;
+    generatePayroll(month: bigint, year: bigint, _generatedBy: string): Promise<{
+        generatedCount: bigint;
+    }>;
+    getAdvancesByEmployee(employeeId: string): Promise<Array<Advance>>;
+    getAllAttendance(): Promise<Array<AttendanceRecord>>;
+    getAllAttendanceByCompany(companyCode: string): Promise<Array<TenantAttendanceRecord>>;
+    getAllPayrollByCompany(companyCode: string): Promise<Array<TenantPayrollRecord>>;
+    getAllTenantKV(companyCode: string): Promise<Array<[string, string]>>;
+    getAttendanceByCompanyAndMonth(companyCode: string, month: string, year: string): Promise<Array<TenantAttendanceRecord>>;
+    getAttendanceByMonth(month: string, year: string): Promise<Array<AttendanceRecord>>;
+    getAttendanceBySite(siteId: string, month: string, year: string): Promise<Array<AttendanceRecord>>;
+    getAuditLogs(): Promise<Array<AuditLog>>;
+    getCompanies(): Promise<Array<CompanyFull>>;
+    getCompaniesUpdate(): Promise<Array<CompanyFull>>;
+    getCompanyByCode(code: string): Promise<CompanyFull | null>;
+    getDepartments(): Promise<{
+        activeDepartments: Array<Department>;
+        departments: Array<Department>;
+    }>;
+    getEmployees(): Promise<{
+        allEmployees: Array<Employee>;
+        activeEmployees: Array<Employee>;
+    }>;
+    getEmployeesByCompany(companyCode: string): Promise<{
+        allEmployees: Array<TenantEmployee>;
+        activeEmployees: Array<TenantEmployee>;
+    }>;
+    getEmployeesBySite(siteId: string): Promise<{
+        allEmployees: Array<Employee>;
+        activeEmployees: Array<Employee>;
+    }>;
+    getPayrollByCompanyAndMonth(companyCode: string, month: bigint, year: bigint): Promise<Array<TenantPayrollRecord>>;
+    getPayrollByMonth(month: bigint, year: bigint): Promise<Array<PayrollRecord>>;
+    getPayrollBySite(siteId: string, month: bigint, year: bigint): Promise<Array<PayrollRecord>>;
+    getPayrollSummary(month: bigint, year: bigint): Promise<PayrollSummary>;
+    getPayrollWithBreakdown(month: bigint, year: bigint): Promise<Array<PayrollBreakdown>>;
+    getPlatformStats(): Promise<PlatformStats>;
+    getRegularizationRequests(): Promise<Array<RegularizationRequest>>;
+    getSites(): Promise<{
+        sites: Array<Site>;
+        activeSites: Array<Site>;
+    }>;
+    getSupervisors(): Promise<Array<Supervisor>>;
+    getTenantSummary(companyCode: string): Promise<TenantSummary>;
+    getTrades(): Promise<{
+        trades: Array<Trade>;
+        activeTrades: Array<Trade>;
+    }>;
+    isCallerAdmin(): Promise<boolean>;
+    loginCompany(companyCode: string, username: string, password: string): Promise<LoginResult>;
+    loginSuperAdmin(username: string, password: string): Promise<SuperAdminLoginResult>;
+    logoutCompanySession(token: string): Promise<boolean>;
+    logoutSuperAdminSession(token: string): Promise<boolean>;
+    manualOverridePayroll(employeeId: string, month: bigint, year: bigint, basicSalary: number, hra: number, conveyance: number, specialAllowance: number, otherAllowance: number, otAmount: number, pfDeduction: number, esiDeduction: number, ptDeduction: number, netPay: number, overriddenBy: string): Promise<boolean>;
+    markAttendance(employeeId: string, date: string, attStatus: string, otHours: number, punchIn: string, punchOut: string, lat: number, lng: number, source: string): Promise<boolean>;
+    markAttendanceForCompany(companyCode: string, employeeId: string, date: string, attStatus: string, otHours: number, advanceAmount: number, punchIn: string, punchOut: string, lat: number, lng: number, source: string): Promise<boolean>;
+    markAttendanceOverwriteForCompany(companyCode: string, employeeId: string, date: string, attStatus: string, otHours: number, advanceAmount: number, punchIn: string, punchOut: string, lat: number, lng: number, source: string): Promise<void>;
+    overwritePayroll(month: bigint, year: bigint, generatedBy: string): Promise<{
+        generatedCount: bigint;
+    }>;
+    regularizeAttendance(id: string, newStatus: string, newOtHours: number, reason: string, changedBy: string): Promise<boolean>;
+    regularizeAttendanceForCompany(companyCode: string, id: string, newStatus: string, newOtHours: number, reason: string, changedBy: string): Promise<boolean>;
+    rejectRegularizationRequest(id: string, approvedBy: string): Promise<boolean>;
+    removeSupervisor(phone: string): Promise<boolean>;
+    savePayrollForCompany(companyCode: string, records: Array<TenantPayrollRecord>): Promise<bigint>;
+    setAdminPassword(oldPassword: string, newPassword: string): Promise<boolean>;
+    setPayrollPT(employeeId: string, month: bigint, year: bigint, ptAmount: number): Promise<boolean>;
+    setTenantKV(companyCode: string, key: string, value: string): Promise<boolean>;
+    updateAttendanceAdvanceForCompany(companyCode: string, employeeId: string, date: string, advanceAmount: number, source: string): Promise<boolean>;
+    updateAttendanceOT(employeeId: string, date: string, otHours: number, source: string): Promise<boolean>;
+    updateAttendanceOTForCompany(companyCode: string, employeeId: string, date: string, otHours: number, source: string): Promise<boolean>;
+    updateCompany(id: string, companyName: string, legalName: string, brandName: string, address: string, state: string, country: string, adminUsername: string, planStatus: string, moduleAccess: Array<string>, logoDataUrl: string, notes: string): Promise<boolean>;
+    updateCompanyAdminPassword(companyId: string, newPassword: string): Promise<boolean>;
+    updateCompanyStatus(id: string, status: string): Promise<boolean>;
+    updateDepartment(id: string, name: string, status: string): Promise<boolean>;
+    updateEmployee(id: string, emp: Employee): Promise<boolean>;
+    updateEmployeeForCompany(companyCode: string, id: string, emp: TenantEmployee): Promise<boolean>;
+    updatePayrollDeductionForCompany(companyCode: string, employeeId: string, month: bigint, year: bigint, ptDeduction: number, advanceDeduction: number, otherDeduction: number): Promise<boolean>;
+    updateSite(id: string, name: string, status: string, lat: number, lng: number, radiusMeters: number): Promise<boolean>;
+    updateTrade(id: string, name: string, status: string): Promise<boolean>;
+    validateCompanySession(token: string): Promise<CompanySession | null>;
+    validateSuperAdminSession(token: string): Promise<SuperAdminSession | null>;
+    verifyAdminPassword(password: string): Promise<boolean>;
+    verifySupervisorPin(phone: string, pin: string): Promise<boolean>;
+}
+import type { CompanyFull as _CompanyFull, CompanySession as _CompanySession, SuperAdminSession as _SuperAdminSession } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async addAdvance(arg0: string, arg1: number, arg2: string, arg3: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addAdvance(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addAdvance(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async addSupervisor(arg0: string, arg1: string, arg2: string, arg3: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addSupervisor(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addSupervisor(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async approveRegularizationRequest(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.approveRegularizationRequest(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.approveRegularizationRequest(arg0, arg1);
+            return result;
+        }
+    }
+    async bulkMarkAttendance(arg0: Array<[string, string, string, number]>, arg1: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.bulkMarkAttendance(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.bulkMarkAttendance(arg0, arg1);
+            return result;
+        }
+    }
+    async bulkMarkAttendanceForCompany(arg0: string, arg1: Array<[string, string, string, number]>, arg2: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.bulkMarkAttendanceForCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.bulkMarkAttendanceForCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async bulkMarkAttendanceOverwriteForCompany(arg0: string, arg1: Array<[string, string, string, number]>, arg2: string): Promise<{
+        errors: Array<string>;
+        successCount: bigint;
+        skippedCount: bigint;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.bulkMarkAttendanceOverwriteForCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.bulkMarkAttendanceOverwriteForCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async changeSuperAdminPassword(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.changeSuperAdminPassword(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.changeSuperAdminPassword(arg0, arg1);
+            return result;
+        }
+    }
+    async createCompany(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: string, arg7: string, arg8: string, arg9: string, arg10: Array<string>, arg11: string): Promise<{
+        success: boolean;
+        errorMsg: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            return result;
+        }
+    }
+    async createDepartment(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createDepartment(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createDepartment(arg0);
+            return result;
+        }
+    }
+    async createEmployee(arg0: Employee): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createEmployee(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createEmployee(arg0);
+            return result;
+        }
+    }
+    async createEmployeeForCompany(arg0: string, arg1: TenantEmployee): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createEmployeeForCompany(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createEmployeeForCompany(arg0, arg1);
+            return result;
+        }
+    }
+    async createRegularizationRequest(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createRegularizationRequest(arg0, arg1, arg2, arg3, arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createRegularizationRequest(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
+    async createSite(arg0: string, arg1: number, arg2: number, arg3: number): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createSite(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createSite(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async createTrade(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createTrade(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createTrade(arg0);
+            return result;
+        }
+    }
+    async deleteAttendanceForCompany(arg0: string, arg1: string, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteAttendanceForCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteAttendanceForCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async deletePayrollForCompanyAndMonth(arg0: string, arg1: bigint, arg2: bigint): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deletePayrollForCompanyAndMonth(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deletePayrollForCompanyAndMonth(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async ensureCompaniesBootstrapped(): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.ensureCompaniesBootstrapped();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.ensureCompaniesBootstrapped();
+            return result;
+        }
+    }
+    async flagAttendance(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.flagAttendance(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.flagAttendance(arg0, arg1);
+            return result;
+        }
+    }
+    async flagAttendanceForCompany(arg0: string, arg1: string, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.flagAttendanceForCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.flagAttendanceForCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async generatePayroll(arg0: bigint, arg1: bigint, arg2: string): Promise<{
+        generatedCount: bigint;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.generatePayroll(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.generatePayroll(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getAdvancesByEmployee(arg0: string): Promise<Array<Advance>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAdvancesByEmployee(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAdvancesByEmployee(arg0);
+            return result;
+        }
+    }
+    async getAllAttendance(): Promise<Array<AttendanceRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllAttendance();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllAttendance();
+            return result;
+        }
+    }
+    async getAllAttendanceByCompany(arg0: string): Promise<Array<TenantAttendanceRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllAttendanceByCompany(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllAttendanceByCompany(arg0);
+            return result;
+        }
+    }
+    async getAllPayrollByCompany(arg0: string): Promise<Array<TenantPayrollRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllPayrollByCompany(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllPayrollByCompany(arg0);
+            return result;
+        }
+    }
+    async getAllTenantKV(arg0: string): Promise<Array<[string, string]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllTenantKV(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllTenantKV(arg0);
+            return result;
+        }
+    }
+    async getAttendanceByCompanyAndMonth(arg0: string, arg1: string, arg2: string): Promise<Array<TenantAttendanceRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAttendanceByCompanyAndMonth(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAttendanceByCompanyAndMonth(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getAttendanceByMonth(arg0: string, arg1: string): Promise<Array<AttendanceRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAttendanceByMonth(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAttendanceByMonth(arg0, arg1);
+            return result;
+        }
+    }
+    async getAttendanceBySite(arg0: string, arg1: string, arg2: string): Promise<Array<AttendanceRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAttendanceBySite(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAttendanceBySite(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getAuditLogs(): Promise<Array<AuditLog>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAuditLogs();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAuditLogs();
+            return result;
+        }
+    }
+    async getCompanies(): Promise<Array<CompanyFull>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCompanies();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCompanies();
+            return result;
+        }
+    }
+    async getCompaniesUpdate(): Promise<Array<CompanyFull>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCompaniesUpdate();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCompaniesUpdate();
+            return result;
+        }
+    }
+    async getCompanyByCode(arg0: string): Promise<CompanyFull | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCompanyByCode(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCompanyByCode(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getDepartments(): Promise<{
+        activeDepartments: Array<Department>;
+        departments: Array<Department>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getDepartments();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getDepartments();
+            return result;
+        }
+    }
+    async getEmployees(): Promise<{
+        allEmployees: Array<Employee>;
+        activeEmployees: Array<Employee>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getEmployees();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getEmployees();
+            return result;
+        }
+    }
+    async getEmployeesByCompany(arg0: string): Promise<{
+        allEmployees: Array<TenantEmployee>;
+        activeEmployees: Array<TenantEmployee>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getEmployeesByCompany(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getEmployeesByCompany(arg0);
+            return result;
+        }
+    }
+    async getEmployeesBySite(arg0: string): Promise<{
+        allEmployees: Array<Employee>;
+        activeEmployees: Array<Employee>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getEmployeesBySite(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getEmployeesBySite(arg0);
+            return result;
+        }
+    }
+    async getPayrollByCompanyAndMonth(arg0: string, arg1: bigint, arg2: bigint): Promise<Array<TenantPayrollRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollByCompanyAndMonth(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPayrollByCompanyAndMonth(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getPayrollByMonth(arg0: bigint, arg1: bigint): Promise<Array<PayrollRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollByMonth(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPayrollByMonth(arg0, arg1);
+            return result;
+        }
+    }
+    async getPayrollBySite(arg0: string, arg1: bigint, arg2: bigint): Promise<Array<PayrollRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollBySite(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPayrollBySite(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getPayrollSummary(arg0: bigint, arg1: bigint): Promise<PayrollSummary> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollSummary(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPayrollSummary(arg0, arg1);
+            return result;
+        }
+    }
+    async getPayrollWithBreakdown(arg0: bigint, arg1: bigint): Promise<Array<PayrollBreakdown>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollWithBreakdown(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPayrollWithBreakdown(arg0, arg1);
+            return result;
+        }
+    }
+    async getPlatformStats(): Promise<PlatformStats> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPlatformStats();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPlatformStats();
+            return result;
+        }
+    }
+    async getRegularizationRequests(): Promise<Array<RegularizationRequest>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getRegularizationRequests();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getRegularizationRequests();
+            return result;
+        }
+    }
+    async getSites(): Promise<{
+        sites: Array<Site>;
+        activeSites: Array<Site>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSites();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSites();
+            return result;
+        }
+    }
+    async getSupervisors(): Promise<Array<Supervisor>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSupervisors();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSupervisors();
+            return result;
+        }
+    }
+    async getTenantSummary(arg0: string): Promise<TenantSummary> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getTenantSummary(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getTenantSummary(arg0);
+            return result;
+        }
+    }
+    async getTrades(): Promise<{
+        trades: Array<Trade>;
+        activeTrades: Array<Trade>;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getTrades();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getTrades();
+            return result;
+        }
+    }
+    async isCallerAdmin(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isCallerAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async loginCompany(arg0: string, arg1: string, arg2: string): Promise<LoginResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.loginCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.loginCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async loginSuperAdmin(arg0: string, arg1: string): Promise<SuperAdminLoginResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.loginSuperAdmin(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.loginSuperAdmin(arg0, arg1);
+            return result;
+        }
+    }
+    async logoutCompanySession(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.logoutCompanySession(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.logoutCompanySession(arg0);
+            return result;
+        }
+    }
+    async logoutSuperAdminSession(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.logoutSuperAdminSession(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.logoutSuperAdminSession(arg0);
+            return result;
+        }
+    }
+    async manualOverridePayroll(arg0: string, arg1: bigint, arg2: bigint, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number, arg9: number, arg10: number, arg11: number, arg12: number, arg13: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.manualOverridePayroll(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.manualOverridePayroll(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
+            return result;
+        }
+    }
+    async markAttendance(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string, arg5: string, arg6: number, arg7: number, arg8: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.markAttendance(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.markAttendance(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            return result;
+        }
+    }
+    async markAttendanceForCompany(arg0: string, arg1: string, arg2: string, arg3: string, arg4: number, arg5: number, arg6: string, arg7: string, arg8: number, arg9: number, arg10: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.markAttendanceForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.markAttendanceForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+            return result;
+        }
+    }
+    async markAttendanceOverwriteForCompany(arg0: string, arg1: string, arg2: string, arg3: string, arg4: number, arg5: number, arg6: string, arg7: string, arg8: number, arg9: number, arg10: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.markAttendanceOverwriteForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.markAttendanceOverwriteForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+            return result;
+        }
+    }
+    async overwritePayroll(arg0: bigint, arg1: bigint, arg2: string): Promise<{
+        generatedCount: bigint;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.overwritePayroll(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.overwritePayroll(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async regularizeAttendance(arg0: string, arg1: string, arg2: number, arg3: string, arg4: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.regularizeAttendance(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.regularizeAttendance(arg0, arg1, arg2, arg3, arg4);
+            return result;
+        }
+    }
+    async regularizeAttendanceForCompany(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string, arg5: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.regularizeAttendanceForCompany(arg0, arg1, arg2, arg3, arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.regularizeAttendanceForCompany(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
+    async rejectRegularizationRequest(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.rejectRegularizationRequest(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.rejectRegularizationRequest(arg0, arg1);
+            return result;
+        }
+    }
+    async removeSupervisor(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.removeSupervisor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.removeSupervisor(arg0);
+            return result;
+        }
+    }
+    async savePayrollForCompany(arg0: string, arg1: Array<TenantPayrollRecord>): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.savePayrollForCompany(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.savePayrollForCompany(arg0, arg1);
+            return result;
+        }
+    }
+    async setAdminPassword(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setAdminPassword(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setAdminPassword(arg0, arg1);
+            return result;
+        }
+    }
+    async setPayrollPT(arg0: string, arg1: bigint, arg2: bigint, arg3: number): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setPayrollPT(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setPayrollPT(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async setTenantKV(arg0: string, arg1: string, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setTenantKV(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setTenantKV(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async updateAttendanceAdvanceForCompany(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateAttendanceAdvanceForCompany(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateAttendanceAdvanceForCompany(arg0, arg1, arg2, arg3, arg4);
+            return result;
+        }
+    }
+    async updateAttendanceOT(arg0: string, arg1: string, arg2: number, arg3: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateAttendanceOT(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateAttendanceOT(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateAttendanceOTForCompany(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateAttendanceOTForCompany(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateAttendanceOTForCompany(arg0, arg1, arg2, arg3, arg4);
+            return result;
+        }
+    }
+    async updateCompany(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: string, arg7: string, arg8: string, arg9: Array<string>, arg10: string, arg11: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            return result;
+        }
+    }
+    async updateCompanyAdminPassword(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateCompanyAdminPassword(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateCompanyAdminPassword(arg0, arg1);
+            return result;
+        }
+    }
+    async updateCompanyStatus(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateCompanyStatus(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateCompanyStatus(arg0, arg1);
+            return result;
+        }
+    }
+    async updateDepartment(arg0: string, arg1: string, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateDepartment(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateDepartment(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async updateEmployee(arg0: string, arg1: Employee): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateEmployee(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateEmployee(arg0, arg1);
+            return result;
+        }
+    }
+    async updateEmployeeForCompany(arg0: string, arg1: string, arg2: TenantEmployee): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateEmployeeForCompany(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateEmployeeForCompany(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async updatePayrollDeductionForCompany(arg0: string, arg1: string, arg2: bigint, arg3: bigint, arg4: number, arg5: number, arg6: number): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updatePayrollDeductionForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updatePayrollDeductionForCompany(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+            return result;
+        }
+    }
+    async updateSite(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number, arg5: number): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateSite(arg0, arg1, arg2, arg3, arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateSite(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
+    async updateTrade(arg0: string, arg1: string, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateTrade(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateTrade(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async validateCompanySession(arg0: string): Promise<CompanySession | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.validateCompanySession(arg0);
+                return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.validateCompanySession(arg0);
+            return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async validateSuperAdminSession(arg0: string): Promise<SuperAdminSession | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.validateSuperAdminSession(arg0);
+                return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.validateSuperAdminSession(arg0);
+            return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async verifyAdminPassword(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.verifyAdminPassword(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.verifyAdminPassword(arg0);
+            return result;
+        }
+    }
+    async verifySupervisorPin(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.verifySupervisorPin(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.verifySupervisorPin(arg0, arg1);
+            return result;
+        }
+    }
+}
+function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_CompanyFull]): CompanyFull | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_CompanySession]): CompanySession | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_SuperAdminSession]): SuperAdminSession | null {
+    return value.length === 0 ? null : value[0];
 }
 export interface CreateActorOptions {
     agent?: Agent;

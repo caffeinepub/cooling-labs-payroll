@@ -1,3 +1,32 @@
+export interface TenantPayrollRecord {
+  id: string;
+  companyCode: string;
+  employeeId: string;
+  month: number;
+  year: number;
+  earnedBasic: number;
+  earnedHra: number;
+  earnedConveyance: number;
+  earnedSpecialAllowance: number;
+  earnedOtherAllowance: number;
+  earnedGross: number;
+  otPay: number;
+  finalGross: number;
+  pfDeduction: number;
+  esiDeduction: number;
+  ptDeduction: number;
+  advanceDeduction: number;
+  otherDeduction: number;
+  netPay: number;
+  paidDays: number;
+  presentDays: number;
+  halfDays: number;
+  lopDays: number;
+  totalDaysInMonth: number;
+  otHours: number;
+  generatedAt: number;
+}
+
 export interface Trade {
   id: string;
   name: string;
@@ -54,6 +83,8 @@ export interface Employee {
   bankName?: string;
   branchAddress?: string;
   dateOfJoining?: string;
+  date_of_birth?: string;
+  work_email?: string;
   createdAt: bigint;
 }
 

@@ -1,0 +1,496 @@
+type Trade = 
+ record {
+   createdAt: int;
+   id: text;
+   name: text;
+   status: text;
+ };
+type TenantSummary = 
+ record {
+   attendanceCount: nat;
+   createdAt: int;
+   employeeCount: nat;
+   modules: vec text;
+   payrollCount: nat;
+   plan: text;
+   status: text;
+   updatedAt: int;
+ };
+type TenantPayrollRecord = 
+ record {
+   advanceDeduction: float64;
+   companyCode: text;
+   earnedBasic: float64;
+   earnedConveyance: float64;
+   earnedGross: float64;
+   earnedHra: float64;
+   earnedOtherAllowance: float64;
+   earnedSpecialAllowance: float64;
+   employeeId: text;
+   esiDeduction: float64;
+   finalGross: float64;
+   generatedAt: int;
+   halfDays: float64;
+   id: text;
+   lopDays: float64;
+   month: nat;
+   netPay: float64;
+   otHours: float64;
+   otPay: float64;
+   otherDeduction: float64;
+   paidDays: float64;
+   pfDeduction: float64;
+   presentDays: float64;
+   ptDeduction: float64;
+   totalDaysInMonth: nat;
+   year: nat;
+ };
+type TenantEmployee = 
+ record {
+   aadhaarNumber: text;
+   bankAccountHolderName: text;
+   bankAccountNumber: text;
+   bankName: text;
+   basicSalary: float64;
+   branchAddress: text;
+   cityType: text;
+   companyCode: text;
+   conveyance: float64;
+   createdAt: int;
+   dateOfJoining: text;
+   departmentId: text;
+   employeeId: text;
+   esiApplicable: bool;
+   esiNumber: text;
+   hra: float64;
+   id: text;
+   ifscCode: text;
+   mobile: text;
+   name: text;
+   otRate: float64;
+   otherAllowance: float64;
+   panNumber: text;
+   pfApplicable: bool;
+   salaryMode: text;
+   site: text;
+   specialAllowance: float64;
+   status: text;
+   tradeId: text;
+   uanNumber: text;
+ };
+type TenantAttendanceRecord = 
+ record {
+   advanceAmount: float64;
+   changedBy: text;
+   companyCode: text;
+   createdAt: int;
+   date: text;
+   employeeId: text;
+   flagReason: text;
+   id: text;
+   isFlagged: bool;
+   isRegularized: bool;
+   lat: float64;
+   lng: float64;
+   otHours: float64;
+   punchIn: text;
+   punchOut: text;
+   regularizationReason: text;
+   status: text;
+   updatedAt: int;
+ };
+type Supervisor = 
+ record {
+   active: bool;
+   name: text;
+   phone: text;
+   pin: text;
+   siteId: text;
+ };
+type SuperAdminSession = 
+ record {
+   createdAt: int;
+   expiresAt: int;
+   token: text;
+   username: text;
+ };
+type SuperAdminLoginResult = 
+ record {
+   errorMsg: text;
+   success: bool;
+   token: text;
+ };
+type Site = 
+ record {
+   createdAt: int;
+   id: text;
+   lat: float64;
+   lng: float64;
+   name: text;
+   radiusMeters: float64;
+   status: text;
+ };
+type RegularizationRequest = 
+ record {
+   approvalStatus: text;
+   approvedAt: int;
+   approvedBy: text;
+   createdAt: int;
+   date: text;
+   employeeId: text;
+   id: text;
+   oldStatus: text;
+   reason: text;
+   requestedBy: text;
+   requestedStatus: text;
+ };
+type PlatformStats = 
+ record {
+   activeCompanies: nat;
+   inactiveCompanies: nat;
+   paidCompanies: nat;
+   suspendedCompanies: nat;
+   totalCompanies: nat;
+   totalEmployees: nat;
+   totalUsers: nat;
+   trialCompanies: nat;
+ };
+type PayrollSummary = 
+ record {
+   totalDeductions: float64;
+   totalEmployees: nat;
+   totalGross: float64;
+   totalNetPay: float64;
+ };
+type PayrollRecord = 
+ record {
+   basicSalary: float64;
+   conveyance: float64;
+   employeeId: text;
+   esiDeduction: float64;
+   generatedAt: int;
+   grossPay: float64;
+   hra: float64;
+   id: text;
+   month: nat;
+   netPay: float64;
+   otAmount: float64;
+   otherAllowance: float64;
+   pfDeduction: float64;
+   ptDeduction: float64;
+   specialAllowance: float64;
+   year: nat;
+ };
+type PayrollBreakdown = 
+ record {
+   halfDays: float64;
+   lopDays: float64;
+   otHours: float64;
+   paidDays: float64;
+   presentDays: float64;
+   "record": PayrollRecord;
+   totalDaysInMonth: nat;
+ };
+type LoginResult = 
+ record {
+   companyCode: text;
+   companyName: text;
+   errorMsg: text;
+   role: text;
+   success: bool;
+   token: text;
+ };
+type Employee = 
+ record {
+   basicSalary: float64;
+   cityType: text;
+   conveyance: float64;
+   createdAt: int;
+   departmentId: text;
+   employeeId: text;
+   esiApplicable: bool;
+   hra: float64;
+   id: text;
+   mobile: text;
+   name: text;
+   otRate: float64;
+   otherAllowance: float64;
+   pfApplicable: bool;
+   salaryMode: text;
+   site: text;
+   specialAllowance: float64;
+   status: text;
+   tradeId: text;
+ };
+type Department = 
+ record {
+   createdAt: int;
+   id: text;
+   name: text;
+   status: text;
+ };
+type CompanySession = 
+ record {
+   companyCode: text;
+   companyId: text;
+   companyName: text;
+   createdAt: int;
+   expiresAt: int;
+   role: text;
+   siteId: text;
+   token: text;
+   username: text;
+ };
+type CompanyFull = 
+ record {
+   address: text;
+   adminPasswordHash: text;
+   adminUsername: text;
+   brandName: text;
+   companyCode: text;
+   companyName: text;
+   country: text;
+   createdAt: int;
+   id: text;
+   legalName: text;
+   logoDataUrl: text;
+   moduleAccess: vec text;
+   notes: text;
+   planStatus: text;
+   state: text;
+   status: text;
+   updatedAt: int;
+ };
+type AuditLog = 
+ record {
+   changedBy: text;
+   entityId: text;
+   entityType: text;
+   id: text;
+   newValue: text;
+   oldValue: text;
+   reason: text;
+   timestamp: int;
+ };
+type AttendanceRecord = 
+ record {
+   changedBy: text;
+   createdAt: int;
+   date: text;
+   employeeId: text;
+   flagReason: text;
+   id: text;
+   isFlagged: bool;
+   isRegularized: bool;
+   lat: float64;
+   lng: float64;
+   otHours: float64;
+   punchIn: text;
+   punchOut: text;
+   regularizationReason: text;
+   status: text;
+   updatedAt: int;
+ };
+type Advance = 
+ record {
+   amount: float64;
+   createdAt: int;
+   date: text;
+   employeeId: text;
+   id: text;
+   site: text;
+ };
+service : {
+  addAdvance: (employeeId: text, amount: float64, date: text, site: text) ->
+   (bool);
+  addSupervisor: (phone: text, name: text, siteId: text, pin: text) -> (bool);
+  approveRegularizationRequest: (id: text, approvedBy: text) -> (bool);
+  bulkMarkAttendance: (records: vec record {
+                                      text;
+                                      text;
+                                      text;
+                                      float64;
+                                    }, source: text) ->
+   (record {
+      errors: vec text;
+      skippedCount: nat;
+      successCount: nat;
+    });
+  bulkMarkAttendanceForCompany: (companyCode: text, records:
+   vec record {
+         text;
+         text;
+         text;
+         float64;
+       }, source: text) ->
+   (record {
+      errors: vec text;
+      skippedCount: nat;
+      successCount: nat;
+    });
+  bulkMarkAttendanceOverwriteForCompany: (companyCode: text, records:
+   vec record {
+         text;
+         text;
+         text;
+         float64;
+       }, source: text) ->
+   (record {
+      errors: vec text;
+      skippedCount: nat;
+      successCount: nat;
+    });
+  changeSuperAdminPassword: (currentPassword: text, newPassword: text) ->
+   (bool);
+  createCompany: (companyCode: text, companyName: text, legalName: text,
+   brandName: text, address: text, state: text, country: text, adminUsername:
+   text, adminPassword: text, planStatus: text, moduleAccess: vec text,
+   logoDataUrl: text) -> (record {
+                            errorMsg: text;
+                            success: bool;
+                          });
+  createDepartment: (name: text) -> (bool);
+  createEmployee: (emp: Employee) -> (bool);
+  createEmployeeForCompany: (companyCode: text, emp: TenantEmployee) ->
+   (bool);
+  createRegularizationRequest: (employeeId: text, date: text, oldStatus:
+   text, requestedStatus: text, reason: text, requestedBy: text) -> (
+   bool);
+  createSite: (name: text, lat: float64, lng: float64, radiusMeters:
+   float64) -> (bool);
+  createTrade: (name: text) -> (bool);
+  deleteAttendanceForCompany: (companyCode: text, employeeId: text, date:
+   text) -> (bool);
+  deletePayrollForCompanyAndMonth: (companyCode: text, month: nat, year:
+   nat) -> (nat);
+  ensureCompaniesBootstrapped: () -> (nat);
+  flagAttendance: (id: text, reason: text) -> (bool);
+  flagAttendanceForCompany: (companyCode: text, id: text, reason: text) ->
+   (bool);
+  generatePayroll: (month: nat, year: nat, _generatedBy: text) ->
+   (record {generatedCount: nat;});
+  getAdvancesByEmployee: (employeeId: text) -> (vec Advance) query;
+  getAllAttendance: () -> (vec AttendanceRecord) query;
+  getAllAttendanceByCompany: (companyCode: text) ->
+   (vec TenantAttendanceRecord) query;
+  getAllPayrollByCompany: (companyCode: text) ->
+   (vec TenantPayrollRecord) query;
+  getAllTenantKV: (companyCode: text) -> (vec record {
+                                                text;
+                                                text;
+                                              }) query;
+  getAttendanceByCompanyAndMonth: (companyCode: text, month: text, year:
+   text) -> (vec TenantAttendanceRecord) query;
+  getAttendanceByMonth: (month: text, year: text) ->
+   (vec AttendanceRecord) query;
+  getAttendanceBySite: (siteId: text, month: text, year: text) ->
+   (vec AttendanceRecord) query;
+  getAuditLogs: () -> (vec AuditLog) query;
+  getCompanies: () -> (vec CompanyFull) query;
+  getCompaniesUpdate: () -> (vec CompanyFull);
+  getCompanyByCode: (code: text) -> (opt CompanyFull) query;
+  getDepartments: () ->
+   (record {
+      activeDepartments: vec Department;
+      departments: vec Department;
+    }) query;
+  getEmployees: () ->
+   (record {
+      activeEmployees: vec Employee;
+      allEmployees: vec Employee;
+    }) query;
+  getEmployeesByCompany: (companyCode: text) ->
+   (record {
+      activeEmployees: vec TenantEmployee;
+      allEmployees: vec TenantEmployee;
+    }) query;
+  getEmployeesBySite: (siteId: text) ->
+   (record {
+      activeEmployees: vec Employee;
+      allEmployees: vec Employee;
+    }) query;
+  getPayrollByCompanyAndMonth: (companyCode: text, month: nat, year: 
+   nat) -> (vec TenantPayrollRecord) query;
+  getPayrollByMonth: (month: nat, year: nat) -> (vec PayrollRecord) query;
+  getPayrollBySite: (siteId: text, month: nat, year: nat) ->
+   (vec PayrollRecord) query;
+  getPayrollSummary: (month: nat, year: nat) -> (PayrollSummary) query;
+  getPayrollWithBreakdown: (month: nat, year: nat) ->
+   (vec PayrollBreakdown) query;
+  getPlatformStats: () -> (PlatformStats) query;
+  getRegularizationRequests: () -> (vec RegularizationRequest) query;
+  getSites: () -> (record {
+                     activeSites: vec Site;
+                     sites: vec Site;
+                   }) query;
+  getSupervisors: () -> (vec Supervisor) query;
+  getTenantSummary: (companyCode: text) -> (TenantSummary) query;
+  getTrades: () ->
+   (record {
+      activeTrades: vec Trade;
+      trades: vec Trade;
+    }) query;
+  isCallerAdmin: () -> (bool);
+  loginCompany: (companyCode: text, username: text, password: text) ->
+   (LoginResult);
+  loginSuperAdmin: (username: text, password: text) ->
+   (SuperAdminLoginResult);
+  logoutCompanySession: (token: text) -> (bool);
+  logoutSuperAdminSession: (token: text) -> (bool);
+  manualOverridePayroll: (employeeId: text, month: nat, year: nat,
+   basicSalary: float64, hra: float64, conveyance: float64, specialAllowance:
+   float64, otherAllowance: float64, otAmount: float64, pfDeduction: 
+   float64, esiDeduction: float64, ptDeduction: float64, netPay: float64,
+   overriddenBy: text) -> (bool);
+  markAttendance: (employeeId: text, date: text, attStatus: text, otHours:
+   float64, punchIn: text, punchOut: text, lat: float64, lng: float64,
+   source: text) -> (bool);
+  markAttendanceForCompany: (companyCode: text, employeeId: text, date: 
+   text, attStatus: text, otHours: float64, advanceAmount: float64, punchIn:
+   text, punchOut: text, lat: float64, lng: float64, source: text) -> (
+   bool);
+  markAttendanceOverwriteForCompany: (companyCode: text, employeeId: 
+   text, date: text, attStatus: text, otHours: float64, advanceAmount:
+   float64, punchIn: text, punchOut: text, lat: float64, lng: float64,
+   source: text) -> ();
+  overwritePayroll: (month: nat, year: nat, generatedBy: text) ->
+   (record {generatedCount: nat;});
+  regularizeAttendance: (id: text, newStatus: text, newOtHours: float64,
+   reason: text, changedBy: text) -> (bool);
+  regularizeAttendanceForCompany: (companyCode: text, id: text, newStatus:
+   text, newOtHours: float64, reason: text, changedBy: text) -> (bool);
+  rejectRegularizationRequest: (id: text, approvedBy: text) -> (bool);
+  removeSupervisor: (phone: text) -> (bool);
+  savePayrollForCompany: (companyCode: text, records:
+   vec TenantPayrollRecord) -> (nat);
+  setAdminPassword: (oldPassword: text, newPassword: text) -> (bool);
+  setPayrollPT: (employeeId: text, month: nat, year: nat, ptAmount:
+   float64) -> (bool);
+  setTenantKV: (companyCode: text, key: text, value: text) -> (bool);
+  updateAttendanceAdvanceForCompany: (companyCode: text, employeeId: 
+   text, date: text, advanceAmount: float64, source: text) -> (bool);
+  updateAttendanceOT: (employeeId: text, date: text, otHours: float64,
+   source: text) -> (bool);
+  updateAttendanceOTForCompany: (companyCode: text, employeeId: text, date:
+   text, otHours: float64, source: text) -> (bool);
+  updateCompany: (id: text, companyName: text, legalName: text, brandName:
+   text, address: text, state: text, country: text, adminUsername: text,
+   planStatus: text, moduleAccess: vec text, logoDataUrl: text, notes:
+   text) -> (bool);
+  updateCompanyAdminPassword: (companyId: text, newPassword: text) -> (bool);
+  updateCompanyStatus: (id: text, status: text) -> (bool);
+  updateDepartment: (id: text, name: text, status: text) -> (bool);
+  updateEmployee: (id: text, emp: Employee) -> (bool);
+  updateEmployeeForCompany: (companyCode: text, id: text, emp:
+   TenantEmployee) -> (bool);
+  updatePayrollDeductionForCompany: (companyCode: text, employeeId: text,
+   month: nat, year: nat, ptDeduction: float64, advanceDeduction: float64,
+   otherDeduction: float64) -> (bool);
+  updateSite: (id: text, name: text, status: text, lat: float64, lng:
+   float64, radiusMeters: float64) -> (bool);
+  updateTrade: (id: text, name: text, status: text) -> (bool);
+  validateCompanySession: (token: text) -> (opt CompanySession) query;
+  validateSuperAdminSession: (token: text) -> (opt SuperAdminSession) query;
+  verifyAdminPassword: (password: text) -> (bool) query;
+  verifySupervisorPin: (phone: text, pin: text) -> (bool) query;
+}
